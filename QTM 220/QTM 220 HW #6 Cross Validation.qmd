@@ -1,0 +1,331 @@
+---
+title: "QTM 220 HW #6"
+author: "Veronica Vargas"
+format: html
+editor: visual
+---
+
+# QTM 220 HW #6
+
+## Exercise #1 - Cross Validation
+
+```{r}
+# load packages
+library(tidyverse)
+library(mosaicData)
+library(leaps)
+library(caret)
+library(ISLR2)
+library(ggplot2)
+```
+
+```{r}
+data("HELPrct")
+head(HELPrct)
+names(HELPrct)
+```
+
+### (a)
+
+```{r}
+ggplot(HELPrct, aes(x = age, y = cesd)) +
+  geom_point(aes(x = age, y = cesd,
+                             color = factor(sex)),
+             alpha = 0.3) +
+  labs(
+    title = "Age vs. CESD by Sex",
+    x = "Age",
+    y = "CESD",
+    color = "Sex") +
+  theme_minimal()
+```
+
+### (b) Parallel Lines Model
+
+```{r}
+mod.coarsen1 <- lm(cesd ~ sex + age, data = HELPrct)
+mod.coarsen1
+```
+
+```{r}
+age_seq <- seq(min(HELPrct$age), max(HELPrct$age), by = 1)
+
+pred_data <- expand.grid(
+  age = age_seq,
+  sex = c(0, 1))
+
+pred_data$sex <- factor(pred_data$sex,
+                             levels = c(0, 1), 
+                             labels = c("male", "female"))
+
+pred_data$predicted_cesd <- predict(mod.coarsen1, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = HELPrct, aes(x = age, y = cesd, color = sex),
+             alpha = 0.3, position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = age, y = predicted_cesd, 
+                                  color = sex), size = 1) +
+  labs(
+    title = "HELPrct Parallel Lines Predictive Model",
+    x = "Age",
+    y = "CESD",
+    color = "Sex"
+  ) +
+  theme_minimal()
+```
+
+### (d) Nonparallel Lines Model
+
+```{r}
+mod.coarsen2 <- lm(cesd ~ age + sex + age*sex, data = HELPrct)
+mod.coarsen2
+```
+
+```{r}
+age_seq <- seq(min(HELPrct$age), max(HELPrct$age), by = 1)
+
+pred_data <- expand.grid(
+  age = age_seq,
+  sex = c(0, 1))
+
+pred_data$sex <- factor(pred_data$sex,
+                             levels = c(0, 1), 
+                             labels = c("male", "female"))
+
+pred_data$predicted_cesd <- predict(mod.coarsen2, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = HELPrct, aes(x = age, y = cesd, color = sex),
+             alpha = 0.3, position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = age, y = predicted_cesd, 
+                                  color = sex), size = 1) +
+  labs(
+    title = "HELPrct Nonparallel Lines Predictive Model",
+    x = "Age",
+    y = "CESD",
+    color = "Sex"
+  ) +
+  theme_minimal()
+```
+
+### (f) Validation Set Approach
+
+```{r}
+set.seed(42)
+n <- nrow(HELPrct)
+train_indices <- sample(1:n, size = 0.70 * n)
+train_data <- HELPrct[train_indices, ]
+test_data <- HELPrct[-train_indices, ]
+```
+
+```{r}
+# Model A: Parallel Lines Model
+model_A_split <- lm(cesd ~ sex + age, data = train_data)
+predictions_A_split <- predict(model_A_split, test_data)
+rss_A_split <- sum((test_data$cesd - predictions_A_split)^2)
+rss_A_split
+
+
+# Model B: Nonparallel Lines Model
+model_B_split <- lm(cesd ~ age + sex + age*sex, data = train_data)
+predictions_B_split <- predict(model_B_split, test_data)
+rss_B_split <- sum((test_data$cesd - predictions_B_split)^2)
+rss_B_split
+```
+
+### (g)
+
+Repetition #1
+
+```{r}
+set.seed(300)
+train_indices <- sample(1:n, size = 0.75 * n)
+train_data <- HELPrct[train_indices, ]
+test_data <- HELPrct[-train_indices, ]
+```
+
+```{r}
+# Model A: Parallel Lines Model
+model_A_split <- lm(cesd ~ sex + age, data = train_data)
+predictions_A_split <- predict(model_A_split, test_data)
+rss_A_split <- sum((test_data$cesd - predictions_A_split)^2)
+rss_A_split
+
+
+# Model B: Nonparallel Lines Model
+model_B_split <- lm(cesd ~ age + sex + age*sex, data = train_data)
+predictions_B_split <- predict(model_B_split, test_data)
+rss_B_split <- sum((test_data$cesd - predictions_B_split)^2)
+rss_B_split
+```
+
+Repetition #2
+
+```{r}
+set.seed(45)
+train_indices <- sample(1:n, size = 0.90 * n)
+train_data <- HELPrct[train_indices, ]
+test_data <- HELPrct[-train_indices, ]
+```
+
+```{r}
+# Model A: Parallel Lines Model
+model_A_split <- lm(cesd ~ sex + age, data = train_data)
+predictions_A_split <- predict(model_A_split, test_data)
+rss_A_split <- sum((test_data$cesd - predictions_A_split)^2)
+rss_A_split
+
+
+# Model B: Nonparallel Lines Model
+model_B_split <- lm(cesd ~ age + sex + age*sex, data = train_data)
+predictions_B_split <- predict(model_B_split, test_data)
+rss_B_split <- sum((test_data$cesd - predictions_B_split)^2)
+rss_B_split
+```
+
+Repetition #3
+
+```{r}
+set.seed(12345)
+train_indices <- sample(1:n, size = 0.95 * n)
+train_data <- HELPrct[train_indices, ]
+test_data <- HELPrct[-train_indices, ]
+```
+
+```{r}
+# Model A: Parallel Lines Model
+model_A_split <- lm(cesd ~ sex + age, data = train_data)
+predictions_A_split <- predict(model_A_split, test_data)
+rss_A_split <- sum((test_data$cesd - predictions_A_split)^2)
+rss_A_split
+
+
+# Model B: Nonparallel Lines Model
+model_B_split <- lm(cesd ~ age + sex + age*sex, data = train_data)
+predictions_B_split <- predict(model_B_split, test_data)
+rss_B_split <- sum((test_data$cesd - predictions_B_split)^2)
+rss_B_split
+```
+
+### (i) LOOCV Approach
+
+```{r}
+rss_summary <- function(data, lev = NULL, model = NULL) {
+  residuals <- data$obs - data$pred
+  rss <- sum(residuals^2)
+  rmse <- sqrt(mean(residuals^2))
+  return(c(RMSE = rmse, RSS = rss))
+}
+```
+
+```{r}
+train_control_loocv <- trainControl(
+  method = "LOOCV",             
+  summaryFunction = rss_summary,
+  savePredictions = "all",    
+  classProbs = FALSE,           
+  allowParallel = FALSE         
+)
+
+# Train Model A: Parallel Lines Model
+set.seed(100)  
+model_A_caret_loocv <- train(
+  cesd ~ sex + age,
+  data = HELPrct,
+  method = "lm",
+  trControl = train_control_loocv,
+  metric = "RMSE"  
+)
+
+# Train Model B: Nonparallel Lines Model
+set.seed(100)  
+model_B_caret_loocv <- train(
+  cesd ~ age + sex + age*sex,
+  data = HELPrct,
+  method = "lm",
+  trControl = train_control_loocv,
+  metric = "RMSE" 
+)
+
+model_A_caret_loocv$results
+model_B_caret_loocv$results
+```
+
+### (l) 10-Fold Validation Approach
+
+```{r}
+train_control_kfold <- trainControl(
+  method = "cv",                
+  number = 10,                  
+  summaryFunction = rss_summary,
+  savePredictions = "final",  
+  classProbs = FALSE, 
+  allowParallel = FALSE)
+
+# Train Model A: Parallel Lines Model
+set.seed(123) 
+model_A_caret <- train(
+  cesd ~ sex + age,
+  data = HELPrct,
+  method = "lm",
+  trControl = train_control_kfold,
+  metric = "RMSE")
+
+# Train Model B: Nonparallel Lines Model
+set.seed(123) 
+model_B_caret <- train(
+  cesd ~ age + sex + age*sex,
+  data = HELPrct,
+  method = "lm",
+  trControl = train_control_kfold,
+  metric = "RMSE")
+
+model_A_caret$results
+model_B_caret$results
+```
+
+### (m) Validation Set Approach Bootstrapped
+
+```{r}
+rss_A_split_boot <- function(data, B = 10000, train_size = 0.7, set_seed = 123) {
+  
+  set.seed(set_seed)
+  rss_A_split_boot <- numeric(B)
+  n <- nrow(data)
+
+  for (b in 1:B) {
+    boot_sample <- data[sample(1:nrow(data), size = n, replace = TRUE), ]
+    
+    train_indices <- sample(1:nrow(boot_sample), size = train_size * n)  
+    train_data <- boot_sample[train_indices, ]  
+    test_data <- boot_sample[-train_indices, ]  
+    
+    model_A_split <- lm(cesd ~ sex + age, data = train_data)
+    predictions_A_split <- predict(model_A_split, test_data)
+    rss_A_split_boot[b] <- sum((test_data$cesd - predictions_A_split)^2)
+  }
+  return(rss_A_split_boot)
+}
+
+modelA_boot_rss <- rss_A_split_boot(HELPrct, B = 10000)
+```
+
+### (o)
+
+```{r}
+ggplot(data = data.frame(rss_A_split = modelA_boot_rss), aes(x = rss_A_split)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(modelA_boot_rss),
+            linetype="dashed",
+            color = "coral", linewidth=1) + 
+  annotate("rect", xmin = quantile(modelA_boot_rss, 0.025), 
+                   xmax = quantile(modelA_boot_rss, 0.975), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = 0.2) +
+  labs(
+    title = "Validation Set Approach RSS
+    Bootstrap Distribution",
+    x = "Validation Set Approach RSS",
+    y = "Count") +
+  theme_minimal() 
+```

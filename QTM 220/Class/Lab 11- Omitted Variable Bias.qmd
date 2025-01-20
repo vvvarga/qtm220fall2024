@@ -1,0 +1,831 @@
+---
+title: "Lab 11"
+author: "F. Nguyen"
+date: "14 Nov. 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Omitted Variables Bias
+
+In previous labs, we learned that in multiple linear regression, when the covariates are not correlated, adding new covariates will not affect the coefficients of existing ones. However, this is not the case when the covariates are correlated. Recall that the OLS model assumes:
+
+$$
+Y_i = \mathbf{X}_i\beta  + u_i, \quad \mathbb{E}[u_i|\mathbf{X}_i] = 0
+$$
+
+That is, the residual $u_i$ is uncorrelated with the covariates $\mathbf{X}_i$.
+
+Now, suppose the **true model** is:
+
+$$
+Y_i = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + \varepsilon_i
+$$
+
+Suppose we do not have the means to sample $X_2$, so our estimated model is:
+
+$$
+Y_i = \hat{\beta}_0 + \hat{\beta}_1 X_{1i} + u_i
+$$
+
+Now we can see that since $u_i$ contains $\beta_2 X_{2i}$, it is no longer uncorrelated with $X_1$, i.e., $\mathbb{E}[u_i|X_{1i}] \neq 0$. This means our $\hat{\beta}_1$ is no longer an unbiased estimator of the true effect $\beta_1$. Specifically, the bias is:
+
+$$
+\text{Bias}(\hat{\beta}_1) = \beta_2 \frac{\text{Cov}(X_1, X_2)}{\text{Var}(X_1)}
+$$
+
+Alternatively, in terms of correlation:
+
+$$
+\text{Bias}(\hat{\beta}_1) = \beta_2 \rho_{X_1 X_2} \frac{\sigma_{X_2}}{\sigma_{X_1}}
+$$
+
+We can illustrate this in R through an example. Here, we are going to look at the model of traffic fatalities in the US at the state level, annually for 1982 through 1988. First, let's load the data:
+
+```{r}
+Fatalities <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/Fatalities.csv")
+head(Fatalities)
+```
+
+Suppose we have identified three potential covariates: `beertax` (tax rate on alcohol), `mormon` (% population that is Mormon), and `income` (income per capita of a state in a given year). Now, we can check the correlations using the `cor()` function:
+
+```{r}
+df_4var <- Fatalities[, c("fatal", "beertax", "mormon", "income")]
+cor(df_4var)
+```
+
+We can see that `beertax` and `mormon` are almost uncorrelated, while both are highly correlated with `income`. Specifically, `beertax` and `income` are negatively correlated, and `mormon` and `income` are negatively correlated.
+
+Now, we estimate the first model with only `beertax`:
+
+```{r}
+mod_1 <- lm(fatal ~ beertax, data = Fatalities)
+summary(mod_1)
+```
+
+We can then add `mormon` in. As in previous lectures, we can expect $\hat{\beta}_1$ to be relatively similar:
+
+```{r}
+mod_2 <- lm(fatal ~ beertax + mormon, data = Fatalities)
+summary(mod_2)
+```
+
+As expected, the coefficient of `beertax` remains the same. Note that the standard error also remains almost unchanged. Hence, omitting uncorrelated covariates will not affect the estimated coefficients and their SE/confidence interval/statistical significance.
+
+Now, let's see what happens when we add `income`, which is correlated with both `beertax` and `mormon`:
+
+```{r}
+mod_3 <- lm(fatal ~ beertax + mormon + income, data = Fatalities)
+summary(mod_3)
+```
+
+As we can see, now the coefficients of `beertax` and `mormon` are drastically different from Model 2. Meanwhile, the standard errors are relatively similar. This means the confidence intervals will be "shifted" to the left or to the right, changing the statistical significance of the coefficients.
+
+```{r}
+confint(mod_2)
+confint(mod_3)
+```
+
+Here, we see that omitting `income` led to **negative biases** on the coefficients of `beertax` and `mormon`. We can, in fact, expect this from the correlation. As from above:
+
+-   `income` is negatively correlated with `beertax` and `mormon`.
+-   `income` is positively correlated with `fatal` (since $\beta_{\text{income}}$ is likely positive).
+
+Therefore, the bias in $\hat{\beta}_{\text{beertax}}$ and $\hat{\beta}_{\text{mormon}}$ is negative.
+
+The general rule of thumb is:
+
+-   **If the omitted variable positively correlates with the outcome**, the bias follows the direction of the correlation between the omitted variable and the current covariates.
+-   **If the omitted variable negatively correlates with the outcome**, the bias follows the direction **opposite** to that of the correlation between the omitted variable and the current covariates.
+
+Thus, the conclusion here is: **Omitting correlated covariates can significantly bias your coefficient estimates**. Additionally, the direction of the bias is determined by the correlation between the omitted variable and the current predictors.
+
+## Implications and Remedies
+
+### Implications
+
+Omitted variable bias is a serious issue in regression analysis. It can lead to:
+
+-   Biased and inconsistent parameter estimates.
+-   Incorrect inferences about the relationship between variables.
+-   Misleading policy implications.
+
+### Remedies
+
+To address omitted variable bias, we can:
+
+1.  **Include Relevant Variables**: Whenever possible, include all relevant variables that affect the dependent variable and are correlated with the included independent variables.
+
+2.  **Instrumental Variables**: If a variable cannot be included because it is unobserved, consider using an instrumental variable that is correlated with the omitted variable but uncorrelated with the error term.
+
+3.  **Fixed Effects Models**: In panel data, use fixed effects to control for unobserved time-invariant characteristics.
+
+4.  **Proxy Variables**: Use proxy variables that can approximate the effect of the omitted variable.
+
+5.  **Sensitivity Analysis**: Perform sensitivity analysis to assess how robust the results are to the inclusion or exclusion of certain variables.
+
+# Multicollinearity
+
+## Perfect Multicollinearity
+
+Another important assumption of a multiple regression model is **No perfect multicollinearity**. Here, *multicollinearity* means one or more covariates can be predicted perfectly by other covariates in the model. To continue with the previous example, assume we decide to create a new variable called `income_thousand`, which is simply `income` but in thousands of USD instead of USD.
+
+```{r}
+Fatalities$income_thousand <- Fatalities$income / 1000
+```
+
+Now, let's see what happens when we try adding this to the regression:
+
+```{r}
+mod_4 <- lm(fatal ~ beertax + mormon + income + income_thousand, data = Fatalities)
+summary(mod_4)
+```
+
+As we can see, R returns `NA` values for the results of this new variable. Why is this the case? Recall the OLS estimator in matrix form:
+
+$$
+\hat{\beta} = (\mathbf{X}^{\prime} \mathbf{X} )^{-1} \mathbf{X}^{\prime}\mathbf{y}
+$$
+
+Note that we have an inversion operation $(\mathbf{X}^{\prime} \mathbf{X} )^{-1}$. Without the new variable, this works just fine:
+
+```{r}
+X1 <- cbind(1, Fatalities$beertax, Fatalities$mormon, Fatalities$income)
+X1 <- as.matrix(X1)
+solve(t(X1) %*% X1)
+```
+
+However, when we add the perfectly collinear variable:
+
+```{r, error = TRUE}
+X2 <- cbind(1, Fatalities$beertax, Fatalities$mormon, Fatalities$income, Fatalities$income_thousand)
+X2 <- as.matrix(X2)
+solve(t(X2) %*% X2)
+```
+
+As we can see, the new variable breaks the matrix inversion operation. Why? We can easily answer this by looking at the rank of the matrix:
+
+```{r}
+qr(X2)$rank
+qr(t(X2) %*% X2)$rank
+dim(t(X2) %*% X2)
+```
+
+As we can see, since $X$ is not full rank, $\mathbf{X}^{\prime} \mathbf{X}$ is not full rank, and thus is not invertible, and we don't have a unique solution for our OLS regression. Thus, the no perfect multicollinearity requirement can also be stated as:
+
+-   The matrix of regressors (i.e., the *design matrix*) must be full rank.
+
+### Examples of Perfect Multicollinearity
+
+-   Including a dummy variable for each category in a categorical variable, along with an intercept term (the "dummy variable trap").
+-   Including variables that are linear combinations of other variables (e.g., $X_4 = X_1 + X_2 + X_3$).
+
+## Imperfect Multicollinearity
+
+We have looked at the forbidding effect of perfect collinearity. How about imperfect collinearity? Generally, imperfect multicollinearity is less of a problem. In fact, weak imperfect multicollinearity is the reason why we are interested in estimating multiple regression models in the first place: the OLS estimator allows us to isolate influences of correlated covariates on the dependent variable.
+
+However, when multicollinearity is high (variables are highly correlated but not perfectly), it can lead to:
+
+-   Large standard errors for the affected coefficients.
+-   Insignificant t-statistics even when the overall model fit is good.
+-   Unstable estimates of coefficients (small changes in data can lead to large changes in estimates).
+
+### Effects of Multicollinearity
+
+-   **Estimates Remain Unbiased**: The OLS estimators remain unbiased.
+-   **Standard Errors Increase**: The variance of the OLS estimators increases.
+-   **Confidence Intervals Widen**: Leading to less precise estimates.
+-   **t-Statistics Decrease**: Making it harder to reject the null hypothesis.
+
+### Detecting Multicollinearity
+
+-   **Correlation Matrix**: Examine the correlation coefficients between pairs of independent variables.
+-   **Variance Inflation Factor (VIF)**: Measures how much the variance of an estimated regression coefficient increases due to multicollinearity.
+
+## Measuring Multicollinearity in R
+
+In R, we can measure the level of multicollinearity through the `vif()` function in the `car` package, which gives the Variance Inflation Factor for each variable in the regression. The larger the VIF score, the higher the collinearity.
+
+### Calculating VIF
+
+The VIF is calculated by measuring how much of the variation of one predictor is explained by the rest of the predictors:
+
+$$
+\text{VIF}_i = \frac{1}{1 - R^2_i}
+$$
+
+Where $R^2_i$ is the $R^2$ of the regression of $X_i$ on the rest of the predictors.
+
+### Example
+
+Here, let's add a quadratic term of the `income` variable to the model. This will be collinear with `income`, but not perfectly:
+
+```{r}
+library(car)
+Fatalities$income2 <- (Fatalities$income)^2
+mod_5 <- lm(fatal ~ beertax + mormon + income + income2, data = Fatalities)
+vif(mod_5)
+```
+
+We can see that, as expected, `income` and `income2` have higher VIF scores than the rest, as they are highly correlated. Typically, a VIF value greater than 5 or 10 indicates high multicollinearity.
+
+We can compare the models:
+
+```{r}
+summary(mod_5)
+summary(mod_3)
+```
+
+### Should We Remove Variables Due to Multicollinearity?
+
+**Generally, no.** Since the coefficient is statistically significant, perhaps we should not remove `income2`, as the relationship might be quadratic in nature. Removing variables solely to reduce multicollinearity can lead to omitted variable bias.
+
+### Remedies for Multicollinearity
+
+-   **Do Nothing**: If the multicollinearity is not causing significant issues (e.g., estimates are stable, standard errors are acceptable), you may decide to do nothing.
+-   **Combine Variables**: If variables are measuring the same concept, consider combining them (e.g., averaging).
+-   **Principal Component Analysis**: Use PCA to reduce the dimensionality.
+-   **Regularization Techniques**: Methods like Ridge Regression can handle multicollinearity by introducing bias but reducing variance.
+
+# Heteroskedasticity
+
+In previous labs, our regression inference procedures rely on the *homoskedasticity* assumption, namely:
+
+$$
+\text{Var}(u_i | X_i = x) = \sigma^2 \quad \forall i \in 1,2,\dots,n
+$$
+
+That is, we assume that the variance of the unobserved term is constant everywhere. Recall that we tested the statistical significance of the coefficients using the SEs from the variance-covariance matrix:
+
+$$
+\hat{\Sigma}_{\beta} = (\mathbf{X}^{\prime} \mathbf{X})^{-1}\hat{\sigma}^2_{\varepsilon}
+$$
+
+With the last term, $\hat{\sigma}^2_{\varepsilon}$ assumed to be fixed. Yet, in many scenarios, this proves to be unrealistic, and we say we have *heteroskedastic errors*:
+
+$$
+\text{Var}(u_i | X_i = x) = \sigma^2_i \quad \forall i \in 1,2,\dots,n
+$$
+
+That is, the variance of the error is different across observations. This requires additional care in performing inference, which we will discuss below.
+
+## Consequences of Heteroskedasticity
+
+-   **Unbiasedness of OLS Estimates**: The OLS estimates of the coefficients remain unbiased.
+-   **Inefficiency**: The OLS estimates are no longer the Best Linear Unbiased Estimators (BLUE). There are more efficient estimators.
+-   **Incorrect Standard Errors**: The standard errors computed under the homoskedasticity assumption are incorrect, leading to invalid confidence intervals and hypothesis tests.
+
+## Testing for Heteroskedasticity
+
+First, using the same data above, let's estimate the regression of `fatal` on `beertax` and `income`:
+
+```{r}
+mod_6 <- lm(fatal ~ beertax + income, data = Fatalities)
+summary(mod_6)
+```
+
+The SEs given by `summary()` above are standard SEs based on the homoskedasticity assumption.
+
+### Visual Inspection
+
+We can first check if our residuals are normally distributed (note, however, that **homoskedasticity does not imply normal distribution**) with the Quantile-Quantile (Q-Q) plot of the studentized residuals:
+
+```{r}
+plot(mod_6, which = 2)
+```
+
+In this plot, if the residuals are normally distributed, they should coincide with the dotted line. We can see here that they are not, so normality of residuals is violated.
+
+Another, more useful, plot to inspect heteroskedasticity is the residuals vs. fitted values plot:
+
+```{r}
+plot(mod_6, which = 1)
+```
+
+Here, we plot the residuals along with the fitted values. We can roughly see that the variances of the residuals increase with the fitted values, so homoskedasticity is violated.
+
+We can also plot the squared residuals for a clearer view:
+
+```{r}
+Fatalities$res2 <- (mod_6$residuals)^2
+plot(mod_6$fitted.values, Fatalities$res2)
+```
+
+The squared residuals should form a relatively uniform band if homoskedasticity is satisfied, and we can clearly see here it's not.
+
+### Formal Tests
+
+#### Breusch–Pagan Test
+
+A more rigorous version of this same idea is the **Breusch–Pagan test**. The robust variant of this test, which is robust to non-Gaussian errors, uses the test statistic:
+
+$$
+nR^2 \sim \chi^2_{S - 1}
+$$
+
+Where:
+
+-   $n$ is the number of observations.
+-   $R^2$ is the $R^2$ of the regression of squared residuals on the predictors.
+-   $S$ is the number of regressors.
+
+It's a one-sided test, so if $nR^2$ is greater than the $1 - \alpha$ quantile of $\chi^2_{S - 1}$, we can reject $H_0$: No heteroskedasticity.
+
+```{r}
+mod_res <- lm(res2 ~ beertax + income, data = Fatalities)
+summary(mod_res)
+
+n <- nrow(Fatalities)
+R2 <- summary(mod_res)$r.squared
+chi_square_stat <- n * R2
+df <- length(mod_res$coefficients) - 1
+critical_value <- qchisq(0.95, df)
+chi_square_stat > critical_value
+```
+
+Therefore, we can reject the null hypothesis and conclude that heteroskedasticity is present.
+
+#### Using Built-in Functions
+
+In R, we can use the `bptest()` function from the `lmtest` package to perform the Breusch–Pagan test:
+
+```{r}
+library(lmtest)
+bptest(mod_6)
+```
+
+## Correcting for Heteroskedasticity
+
+### Heteroskedasticity-Robust Standard Errors
+
+In order to correct for heteroskedasticity, we can use *heteroskedasticity-robust standard errors* in place of the usual standard errors. One estimator for such robust SEs is the Eicker-Huber-White estimator.
+
+#### Eicker-Huber-White Estimator
+
+$$
+\widehat{V}_{\beta}^{\text{HC0}} = (\mathbf{X}^\prime\mathbf{X})^{-1}\mathbf{X}^\prime\widehat{\Omega}\mathbf{X}(\mathbf{X}^\prime\mathbf{X})^{-1}
+$$
+
+Where $\widehat{\Omega}$ is a diagonal matrix of the squared residuals.
+
+We can manually calculate this for the regression above as:
+
+```{r}
+X <- model.matrix(mod_6)
+e <- mod_6$residuals
+Omega <- diag(e^2)
+bun <- solve(t(X) %*% X)
+V_HC0 <- bun %*% t(X) %*% Omega %*% X %*% bun
+V_HC0
+```
+
+The SEs are now the square root of the diagonal of $\widehat{V}_{\beta}^{\text{HC0}}$:
+
+```{r}
+sqrt(diag(V_HC0))
+```
+
+We can also get this using the `vcovHC()` function of the `sandwich` package, with `type = "HC0"`:
+
+```{r}
+library(sandwich)
+vcov_HC0 <- vcovHC(mod_6, type = "HC0")
+sqrt(diag(vcov_HC0))
+```
+
+Now, we can use these new SEs for inference with t-tests, confidence intervals, or F-tests as before. For convenience, the `lmtest` package provides the `coeftest()` function, which does some of those for us automatically:
+
+```{r}
+library(lmtest)
+coeftest(mod_6, vcov = vcov_HC0)
+```
+
+We can see that, compared to the results with homoskedasticity assumption, the standard errors have changed.
+
+### Other Variants of Robust SEs
+
+There are also other variants of the heteroskedasticity-robust SE estimator, called HC1, HC2, and HC3.
+
+-   **HC1**: Adjusts for degrees of freedom.
+
+-   **HC2**: Uses a leverage adjustment.
+
+-   **HC3**: Similar to HC2 but makes a different adjustment.
+
+In R:
+
+```{r}
+vcov_HC1 <- vcovHC(mod_6, type = "HC1")
+sqrt(diag(vcov_HC1))
+
+vcov_HC2 <- vcovHC(mod_6, type = "HC2")
+sqrt(diag(vcov_HC2))
+
+vcov_HC3 <- vcovHC(mod_6, type = "HC3")
+sqrt(diag(vcov_HC3))
+```
+
+HC3 is often recommended, especially in small samples.
+
+### Using the `lm_robust` Function
+
+Alternatively, the `estimatr` package provides the `lm_robust()` function, which directly provides robust standard errors:
+
+```{r}
+library(estimatr)
+mod_robust <- lm_robust(fatal ~ beertax + income, data = Fatalities, se_type = "HC3")
+summary(mod_robust)
+```
+
+## Cluster-Robust Standard Errors
+
+In some cases, if our data are sampled by clusters (e.g., by states, firms, schools...), or we suspect that the errors are correlated within clusters, we can use *cluster-robust standard errors*. The basic idea is to adjust the standard errors to account for within-cluster correlation.
+
+### Formula
+
+The cluster-robust variance estimator is:
+
+$$
+\widehat{V}_{\beta}^{\text{Cluster}} = (\mathbf{X}^\prime\mathbf{X})^{-1} \left( \sum_{g=1}^G \mathbf{X}_g^\prime \mathbf{e}_g \mathbf{e}_g^\prime \mathbf{X}_g \right) (\mathbf{X}^\prime\mathbf{X})^{-1}
+$$
+
+Where:
+
+-   $G$ is the number of clusters.
+-   $\mathbf{X}_g$ is the design matrix for cluster $g$.
+-   $\mathbf{e}_g$ is the vector of residuals for cluster $g$.
+
+### In R
+
+We can use the `vcovCL()` function of `sandwich` to get this. For example, since our data is a panel of state-years, we can cluster by `state`:
+
+```{r}
+vcov_cluster <- vcovCL(mod_6, cluster = ~ state, type = "HC3")
+sqrt(diag(vcov_cluster))
+```
+
+Now, to plug into `coeftest()`:
+
+```{r}
+coeftest(mod_6, vcov = vcov_cluster)
+```
+
+Alternatively, using `lm_robust`:
+
+```{r}
+mod_cluster <- lm_robust(fatal ~ beertax + income, data = Fatalities, clusters = state, se_type = "CR2")
+summary(mod_cluster)
+```
+
+## When to Use Robust Standard Errors
+
+-   **Always**: The modern practice in various fields recommend always using robust standard errors, as they are valid under both homoskedasticity and heteroskedasticity.
+-   **Suspected Heteroskedasticity**: When diagnostic tests or plots suggest heteroskedasticity.
+-   **Clustered Data**: When data is clustered, and errors are likely correlated within clusters.
+
+# Data Imputation
+
+The next topic of today's lab is data imputation, that is, dealing with missing data by approximating (*imputing*) those values.
+
+## Types of Missing Data
+
+-   **Missing Completely at Random (MCAR)**: The missingness is entirely random.
+-   **Missing at Random (MAR)**: The missingness depends on observed data.
+-   **Missing Not at Random (MNAR)**: The missingness depends on unobserved data.
+
+## Simple Imputation Methods
+
+### Mean Imputation
+
+First, let's start by simulating some missingness, by removing the income of the first 100 observations:
+
+```{r}
+Fatalities$income_miss <- Fatalities$income
+Fatalities[1:100, "income_miss"] <- NA
+```
+
+Now, the most basic way to impute the missing data is by replacing it with the sample mean:
+
+```{r}
+mean_income <- mean(Fatalities$income_miss, na.rm = TRUE)
+Fatalities$income_miss[is.na(Fatalities$income_miss)] <- mean_income
+```
+
+Let's compare the regression with the imputed data and the true data:
+
+```{r}
+summary(lm(fatal ~ income, data = Fatalities))
+summary(lm(fatal ~ income_miss, data = Fatalities))
+```
+
+Here, we can see that the difference is quite large, and the coefficient is biased towards 0, since we are replacing the missing values with a constant, removing the relevant variation.
+
+### Problems with Mean Imputation
+
+-   **Underestimates Variability**: The variability of the imputed variable is underestimated.
+-   **Distorts Relationships**: Relationships with other variables can be distorted.
+-   **Biases Estimates**: Leads to biased estimates.
+
+## Regression Imputation
+
+Another approach is to predict the missing variable with a regression. Here, we will predict missing `income` with population `pop` and unemployment rate `unemp`:
+
+```{r}
+# Set missing values
+Fatalities$income_miss[1:100] <- NA
+
+# Fit imputation model
+mod_impute <- lm(income_miss ~ pop + unemp, data = Fatalities)
+
+# Predict missing values
+predicted_income <- predict(mod_impute, newdata = Fatalities[is.na(Fatalities$income_miss), ])
+
+# Impute missing values
+Fatalities$income_miss[is.na(Fatalities$income_miss)] <- predicted_income
+
+# Regression with imputed data
+summary(lm(fatal ~ income_miss, data = Fatalities))
+```
+
+Here, we see that this in fact has the opposite effect of making `income` with missing data an even stronger predictor. This is because `pop` and `unemp` are also good predictors of `fatal`, and we inherit the relevant variation without sampling noise and model uncertainty. This can lead to overly optimistic conclusions.
+
+### Problems with Single Imputation
+
+-   **Underestimates Variance**: Imputed values are treated as known, ignoring the uncertainty in the imputation.
+-   **Overfitting**: Can lead to overfitting if predictors of the missing variable are also predictors of the outcome.
+
+## Multiple Imputation
+
+To counter this, we can introduce some noise to the imputations, by taking random draws from the model prediction errors.
+
+### Steps in Multiple Imputation
+
+1.  **Imputation**: Create multiple complete datasets by imputing missing values multiple times, incorporating appropriate variability.
+2.  **Analysis**: Analyze each dataset separately using standard statistical methods.
+3.  **Pooling**: Combine the results from the multiple analyses into a single set of estimates and standard errors.
+
+### Implementing Multiple Imputation in R
+
+We can use the `mice` package to perform multiple imputation.
+
+```{r}
+library(mice)
+
+# Simulate missing data
+Fatalities$income_miss[1:100] <- NA
+
+# Imputation using mice
+imp <- mice(Fatalities[, c("fatal", "income_miss", "pop", "unemp")], m = 5, method = 'norm.predict', seed = 123)
+
+# Analyze each imputed dataset
+fit <- with(imp, lm(fatal ~ income_miss))
+
+# Pool the results
+pooled <- pool(fit)
+summary(pooled)
+```
+
+The `mice` package automatically handles the imputation, analysis, and pooling steps.
+
+### Advantages of Multiple Imputation
+
+-   **Preserves Variability**: Accounts for uncertainty in the imputed values.
+-   **Unbiased Estimates**: Provides unbiased parameter estimates under MAR assumption.
+-   **Uses All Data**: Makes use of all available data.
+
+### Considerations
+
+-   **Assumptions**: Multiple imputation assumes data are missing at random (MAR).
+-   **Number of Imputations**: Generally, 5 to 10 imputations are sufficient.
+-   **Complexity**: Requires careful specification and understanding of the imputation models.
+
+## Other Imputation Methods
+
+-   **K-Nearest Neighbors Imputation**
+-   **Expectation-Maximization Algorithm**
+-   **Hot Deck Imputation**
+-   **Multiple Imputation by Chained Equations (MICE)**: As above.
+
+# Outlier Detection and Observation Importance
+
+In regression analysis, outliers and influential observations can have a significant impact on the estimated coefficients and the overall model fit. Identifying and appropriately handling these observations is crucial for building reliable models.
+
+## Types of Outliers
+
+1.  **Univariate Outliers**: Observations with extreme values in one variable.
+2.  **Multivariate Outliers**: Observations that may not be extreme in any single variable but are unusual combinations across variables.
+3.  **Leverage Points**: Observations with extreme values in the independent variables.
+4.  **Influential Observations**: Observations that have a large impact on the parameter estimates.
+
+## Detecting Outliers
+
+### Residual Analysis
+
+The residuals \$ e_i = y_i - \hat{y}\_i \$ can be used to identify outliers in the dependent variable.
+
+#### Standardized Residuals
+
+Standardized residuals are the residuals divided by their estimated standard deviation:
+
+$$
+r_i = \frac{e_i}{\hat{\sigma}(1 - h_{ii})^{1/2}}
+$$
+
+Where \$ h\_{ii} \$ is the leverage of observation \$ i \$.
+
+Observations with standardized residuals greater than 2 (in absolute value) are often considered outliers.
+
+#### Studentized Residuals
+
+Studentized residuals adjust for the fact that the variance of the residuals changes with leverage:
+
+$$
+t_i = \frac{e_i}{\hat{\sigma}_{(i)} (1 - h_{ii})^{1/2}}
+$$
+
+Where \$ \hat{\sigma}\_{(i)} \$ is the estimated standard deviation excluding observation \$ i \$.
+
+### Leverage
+
+Leverage measures how far an observation's independent variable values are from those of the other observations.
+
+The leverage \$ h\_{ii} \$ is the diagonal element of the hat matrix \$ \mathbf{H} = \mathbf{X}(\mathbf{X}'\mathbf{X})\^{-1}\mathbf{X}' \$.
+
+Observations with high leverage can have a significant impact on the fitted values.
+
+### Influence Measures
+
+Influence measures quantify the impact of an observation on the parameter estimates.
+
+#### Cook's Distance
+
+Cook's Distance combines the information of residuals and leverage to measure the influence of an observation:
+
+$$
+D_i = \frac{(e_i^2)}{p \hat{\sigma}^2} \left( \frac{h_{ii}}{(1 - h_{ii})^2} \right)
+$$
+
+Where \$ p \$ is the number of parameters in the model.
+
+Observations with Cook's Distance greater than 0.5 or 1 are often considered influential.
+
+#### DFBETAS
+
+DFBETAS measures the change in each coefficient when observation \$ i \$ is deleted:
+
+$$
+\text{DFBETAS}_{ij} = \frac{\hat{\beta}_j - \hat{\beta}_{j(i)}}{\hat{\sigma}_{(i)} \sqrt{c_{jj}}}
+$$
+
+Where \$ c\_{jj} \$ is the \$ j \$-th diagonal element of \$ (\mathbf{X}'\mathbf{X})\^{-1} \$.
+
+Values greater than \$ \frac{2}{\sqrt{n}} \$ in absolute value may indicate an influential observation.
+
+### Using R to Detect Outliers
+
+We can use built-in functions and diagnostic plots to detect outliers and influential observations.
+
+#### Diagnostic Plots
+
+The `plot()` function for `lm` objects provides several diagnostic plots.
+
+```{r}
+mod_full <- lm(fatal ~ beertax + income + mormon + unemp + drinkage, data = Fatalities)
+par(mfrow = c(2, 2))
+plot(mod_full)
+```
+
+-   **Residuals vs Fitted**: Helps detect non-linearity and heteroskedasticity.
+-   **Normal Q-Q Plot**: Assesses normality of residuals.
+-   **Scale-Location Plot**: Checks homoscedasticity.
+-   **Residuals vs Leverage**: Identifies influential observations.
+
+#### Identifying High Leverage Points
+
+We can calculate leverage values and identify observations with high leverage.
+
+```{r}
+hat_values <- hatvalues(mod_full)
+plot(hat_values, type = "h", main = "Leverage Values", ylab = "Leverage")
+abline(h = 2 * mean(hat_values), col = "red", lty = 2)
+```
+
+Observations with leverage values significantly higher than the average leverage (e.g., \$ 2 \times \text{average leverage} \$) may be considered high leverage points.
+
+#### Cook's Distance
+
+Calculate Cook's Distance to identify influential observations.
+
+```{r}
+cooks_d <- cooks.distance(mod_full)
+plot(cooks_d, type = "h", main = "Cook's Distance", ylab = "Cook's Distance")
+abline(h = 4 / nrow(Fatalities), col = "red", lty = 2)
+```
+
+Observations with Cook's Distance greater than \$ \frac{4}{n} \$ may be influential.
+
+#### Influence Measures
+
+Use the `influence.measures()` function to obtain various influence statistics.
+
+```{r}
+influence_measures <- influence.measures(mod_full)
+summary(influence_measures)
+```
+
+This provides:
+
+-   **DFBETAS**: Change in coefficients.
+-   **DFFITS**: Influence on fitted values.
+-   **Covariance Ratios (COVRATIO)**: Influence on covariance matrix.
+-   **Cook's Distance**.
+-   **Standardized Residuals**.
+
+### Example: Identifying Influential Observations
+
+Let's identify observations that are potentially influential.
+
+```{r}
+# Get influence measures
+infl <- influence.measures(mod_full)
+
+# Extract DFBETAS
+dfbetas <- infl$infmat[, grep("dfb", colnames(infl$infmat))]
+
+# Find observations where any DFBETAS exceeds threshold
+n <- nrow(Fatalities)
+threshold <- 2 / sqrt(n)
+influential_obs <- apply(dfbetas, 1, function(x) any(abs(x) > threshold))
+
+# List influential observations
+which(influential_obs)
+```
+
+We can examine these observations more closely.
+
+```{r}
+Fatalities[influential_obs, ]
+```
+
+### Dealing with Outliers and Influential Observations
+
+-   **Verify Data Entry**: Check for data entry errors.
+-   **Understand Context**: Determine if the observation is valid or an error.
+-   **Consider Transformation**: Apply transformations to reduce the impact.
+-   **Robust Regression**: Use methods less sensitive to outliers (e.g., `rlm` in the `MASS` package).
+-   **Model Comparison**: Compare models with and without the influential observation.
+-   **Document Decisions**: Always document any decisions to remove or adjust observations.
+
+## Robust Regression
+
+If outliers are a concern, robust regression methods can provide estimates that are less sensitive to outliers.
+
+### Using `rlm` from the `MASS` Package
+
+```{r}
+library(MASS)
+mod_robust <- rlm(fatal ~ beertax + income + mormon + unemp + drinkage, data = Fatalities)
+summary(mod_robust)
+```
+
+The `rlm` function fits a linear model using M-estimation, which reduces the influence of outliers.
+
+### Comparing Models
+
+```{r}
+# Compare coefficients
+coefficients(mod_full)
+coefficients(mod_robust)
+```
+
+We can see how the coefficients change when using robust regression.
+
+## Conclusion
+
+Outliers and influential observations can significantly impact regression results. It is essential to:
+
+-   **Detect**: Use diagnostic tools to identify potential outliers and influential points.
+-   **Diagnose**: Understand why these observations are outliers.
+-   **Decide**: Determine the appropriate action, whether to exclude, adjust, or keep the observations.
+-   **Document**: Record all steps and rationale for transparency.
+
+Proper handling of outliers ensures the reliability and validity of regression analyses.
+
+# Conclusion
+
+In this lab, we have explored several important topics in regression diagnostics and data analysis:
+
+-   **Omitted Variables Bias**: We examined how omitting relevant variables can bias the estimated coefficients and discussed ways to mitigate this issue.
+-   **Multicollinearity**: We learned about perfect and imperfect multicollinearity, their effects on regression estimates, and methods to detect and address multicollinearity.
+-   **Heteroskedasticity**: We investigated the consequences of heteroskedasticity, how to detect it using graphical and formal tests, and how to correct for it using robust standard errors.
+-   **Data Imputation**: We explored methods for handling missing data, including mean imputation, regression imputation, and multiple imputation using the `mice` package.
+-   **Outlier Detection and Observation Importance**: We learned how to detect outliers and influential observations, the impact they have on regression models, and strategies for dealing with them.
+
+## These tools are essential for conducting rigorous and reliable regression analysis. Understanding and applying these diagnostics help ensure that the conclusions drawn from statistical models are valid and robust.

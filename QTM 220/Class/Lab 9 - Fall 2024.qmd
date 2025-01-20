@@ -1,0 +1,625 @@
+---
+title: "Lab 9 - Model Selection"
+author: "F. Nguyen"
+date: " 31 Oct 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+First, we will load the data and apply the same transformation as in the previous lab.
+
+```{r}
+cps <- read.csv("cps.csv")
+cps$wage <- cps$earnings/(cps$week*cps$hours)
+cps <- cps[cps$education <= 16,]
+cps$marital <- ifelse(cps$marital <= 2, 1, 0)
+```
+
+# The Importance
+
+Recall that in the previous lab, we tried to model the relationship between `wage` and `age`, using various types of linear models. Since the goal of a linear regression model is to minize the Sum of Squared Residuals, it stands to reason that we can use this metric to compare and pick the best model. However, does this always work? To test this, we can simulate the following simple linear data generating process:
+
+$$
+Wage_i = 0.5 \times Age_i + \varepsilon_i
+$$ We do this in R by:
+
+```{r}
+set.seed(123)
+n <- 1000  # Number of obs
+age <- sample(18:60, n, replace = TRUE)  # Random ages between 18 and 65
+# True DGP is purely linear without interaction
+wage <- 0 + 0.5* age + rnorm(n, mean = 0, sd = 15)  # Linear trend with noise
+
+# Create the data frame
+simulated_data <- data.frame(age = age, wage = wage)
+```
+
+Now, in the next step, let's estimate the line model:
+
+```{r}
+# continuous age - Line
+mod.line <- lm(wage ~ age, data = simulated_data)
+summary(mod.line)
+rss.line <- sum(resid(mod.line)^2)
+print(paste("RSS for Line Model:", rss.line))
+```
+
+Assuming we do not know that that is the true model, and we want to compare it with a more complicated curve model with `factor(age)`:
+
+```{r}
+# factor age - Curve model
+mod.curve <- lm(wage ~ factor(age), data = simulated_data)
+summary(mod.curve)
+rss.curve <- sum(resid(mod.curve)^2)
+print(paste("RSS for Curve Model:", rss.curve))
+# the score is the RSS
+# the curved model has a lower RSS than the linear model
+```
+
+Here, we see that the second model, the Curve model, actually results in lower Sum of Squared Residuals, even though we know, from the simulation, that the line model is in fact the true model. This is, as you have learned in lecture, due to **overfitting**. The more granular models tend to overfit the data and sometimes lead to lower SSR due to fitting noises.
+
+In order to address this, in practice, we often want to make sure that we evalulate the models performance (in terms of SSR in this case) on a **different** sample than the sample we use to estimate them, that is, we want to evaluate the **Out-of-Sample Performance**. For example, if we randomly split the data into two samples, a *train set* and a *validation set*, then use fit the models using the *train set* and evaluate them on the *validation set*:
+
+```{r}
+set.seed(42)
+train_indices <- sample(1:n, size = 0.7 * n)
+train_data <- simulated_data[train_indices, ]
+test_data <- simulated_data[-train_indices, ]
+```
+
+In the above, we randomly select 70% of the data to the train set, and the rest to the validation set. Now, we can proceed to estimate the models on the train set and evaluate them on the validation set:
+
+```{r}
+# Model A: Linear
+## estimate model
+model_A_split <- lm(wage ~ age, data = train_data)
+## Evaluate on the validation set
+predictions_A_split <- predict(model_A_split, test_data)
+rss_A_split <- sum((test_data$wage - predictions_A_split)^2)
+rss_A_split
+
+
+# Model B: Categorical
+## estimate model
+model_B_split <- lm(wage ~ factor(age), data = train_data)
+## Evaluate on the validation set
+predictions_B_split <- predict(model_B_split, test_data)
+rss_B_split <- sum((test_data$wage - predictions_B_split)^2)
+rss_B_split
+```
+
+Here, we see that once the evaluation is performed on a different sample, the Curve (categorical) model has higher SSR and thus performs worse than the linear model, which is the true model according to our simulation.
+
+# Validation Set Method
+
+The first approach, the **Validation Set** method, is what we did in the previous example. Specifically, this method calls for random split of the full dataset into two subsets, a *train set* and a *validation set*, and then evaluating the models estimated on the train set using the validation set. We will not repeat the example here, however, let's discuss some common extensions of this simple approach.
+
+First, due to the random split of the data, we may inadvertently introduce new sampling biases. We can demonstrate this with the distribution of `age`. Here, we will recombine the data for plotting:
+
+```{r}
+# Add a new column to each set to indicate the type
+train_data$Set <- "Training"
+test_data$Set <- "Test"
+
+# Combine the two datasets
+combined_data <- rbind(train_data, test_data)
+```
+
+Now, we can plot the histogram of `age` distribution in the test and train sets:
+
+```{r}
+# Load ggplot2
+library(ggplot2)
+
+# Plot overlayed histograms
+ggplot(combined_data, aes(x = age, fill = Set)) +
+  geom_histogram(aes(y = ..density..), alpha = 0.5, position = "identity", binwidth = 1) +
+  theme_minimal() +
+  labs(title = "Age Distribution: Training vs. Test Sets",
+       x = "Age",
+       y = "Count") +
+  scale_fill_manual(values = c("Training" = "steelblue", "Test" = "salmon")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Here, we see that the distributions of `age` are different between the two sets for certain ages, and logically would be different from the full dataset. This means that the model trained on the train set may be overfitted to that specific data distribution, and inflate the error while evaluated on the validation set. We will demonstrate the variance of validation set approach later, but there are some possible extensions to "fix" this.
+
+## Stratified Sample Splitting
+
+The most obvious way to address the issue above is to ensure that the covariate distributions are similar across train and validation sets. This is through a process called *stratified sampling*. Specifically, instead of splitting the data at full random, we randomly split the data **within each stratum**, which is age in this case, and merge everything into train and validation sets. Here, let's manual construct a function to do this:
+
+```{r}
+manual_stratified_split <- function(data, group_var, train_frac = 0.7) {
+  train_indices <- c()
+  test_indices <- c()
+  
+  groups <- unique(data[[group_var]])
+  
+  for (group in groups) {
+    ## Calculating the size
+    ## Select the indices of rows where group = group
+    group_data <- which(data[[group_var]] == group)
+    n_group <- length(group_data)
+    n_train <- floor(train_frac * n_group)
+    
+    if (n_group >= 2) {
+      n_train <- max(n_train, 1)
+      n_test <- n_group - n_train
+      if (n_test < 1) {
+        n_train <- n_group
+      }
+    } else if (n_group == 1) {
+      n_train <- 1
+    }
+    
+    set.seed(NULL)  # Ensure randomness
+    
+    ## Subsetting
+    train_sample <- sample(group_data, size = n_train)
+    test_sample <- setdiff(group_data, train_sample)
+    
+    ## Concat
+    train_indices <- c(train_indices, train_sample)
+    test_indices <- c(test_indices, test_sample)
+  }
+  
+  train_set <- data[train_indices, ]
+  test_set <- data[test_indices, ]
+  
+  return(list(train = train_set, test = test_set))
+}
+```
+
+Now, we can apply the `manual_stratified_split()` function to the simulated data set:
+
+```{r}
+split_data <- manual_stratified_split(simulated_data, group_var = "age", train_frac = 0.7)
+train_data <- split_data$train
+test_data <- split_data$test
+```
+
+Let's check the distribution of `age`:
+
+```{r}
+# Add a new column to each set to indicate the type
+train_data$Set <- "Training"
+test_data$Set <- "Test"
+# Combine the two datasets
+combined_data <- rbind(train_data, test_data)
+# Plot overlayed histograms
+ggplot(combined_data, aes(x = age, fill = Set)) +
+  geom_histogram(aes(y = ..density..), alpha = 0.5, position = "identity", binwidth = 1) +
+  theme_minimal() +
+  labs(title = "Age Distribution: Training vs. Test Sets",
+       x = "Age",
+       y = "Count") +
+  scale_fill_manual(values = c("Training" = "steelblue", "Test" = "salmon")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Here, we see that the distributions are now similar! We can then perform the same comparison sets as above:
+
+```{r}
+# Model A: Linear
+## estimate model
+model_A_split <- lm(wage ~ age, data = train_data)
+## Evaluate on the validation set
+predictions_A_split <- predict(model_A_split, test_data)
+rss_A_split <- sum((test_data$wage - predictions_A_split)^2)
+rss_A_split
+
+
+# Model B: Categorical
+## estimate model
+model_B_split <- lm(wage ~ factor(age), data = train_data)
+## Evaluate on the validation set
+predictions_B_split <- predict(model_B_split, test_data)
+rss_B_split <- sum((test_data$wage - predictions_B_split)^2)
+rss_B_split
+```
+
+Here, the linear model still came out on top, as expected.
+
+## Repeated Train-Validation Split
+
+The approach above works well if we have one or a few covariates. However, in many cases, the number of covariate groups is numerous, and stratified sampling is not computationally feasible. In these cases, we can instead perform the train-validation split multiple times, and take the average of the RSS of each model. This is called *Repeated Validation Set*, or *Monte Carlo Cross-Validation* approach.
+
+Note that, if there are many factors and our sample is small, in some random splits some groups may not be presented in one of train or validation set. In those cases, here we will simply ignore those iterations and save them as `NA`.
+
+```{r}
+set.seed(42)
+k <- 500
+n <- nrow(simulated_data)
+linear_rss <- c()
+curve_rss <- c()
+
+# Initialize a vector to store failed iteration numbers
+failed_iterations <- integer(0)
+
+# Perform Manual Monte Carlo Cross-Validation with Error Handling
+for(i in 1:k){
+  tryCatch({
+    # Create a random train-test split (70% train, 30% test)
+    train_indices <- sample(1:n, size = 0.7*n)
+    train_data <- simulated_data[train_indices, ]
+    test_data <- simulated_data[-train_indices, ]
+    
+    # Model A: Linear Regression
+    model_A_split <- lm(wage ~ age, data = train_data)
+    predictions_A_split <- predict(model_A_split, test_data)
+    rss_A_split <- sum((test_data$wage - predictions_A_split)^2)
+    linear_rss[i] <- rss_A_split
+    
+    # Model B: Categorical Regression with Explicit Levels
+    model_B_split <- lm(wage ~ factor(age), data = train_data)
+    predictions_B_split <- predict(model_B_split, test_data)
+    rss_B_split <- sum((test_data$wage - predictions_B_split)^2)
+    curve_rss[i] <- rss_B_split
+  }, 
+  
+  ## Save error as NA
+  error = function(e){
+    # Assign NA to RSS for both models in case of error
+    linear_rss[i] <<- NA
+    curve_rss[i] <<- NA
+    # Log failed iteration
+    failed_iterations <<- c(failed_iterations, i)
+  })
+}
+
+# Summary Statistics
+cat("Monte Carlo Cross-Validation Results:\n")
+cat("Total Iterations:", k, "\n")
+cat("Successful Iterations:", k - length(failed_iterations), "\n")
+cat("Failed Iterations:", length(failed_iterations), "\n\n")
+
+# Summary for Linear Model
+cat("Linear Model RSS Summary:\n")
+print(summary(linear_rss))
+
+# Summary for Categorical Model
+cat("Curve (Catgorical) Model RSS Summary:\n")
+print(summary(curve_rss))
+```
+
+From the above, we see that the RSS of the Curve is higher on average, meaning the linear model performs better, as expected.
+
+### Using the `Caret` package:
+
+In R we can also use the `caret` package to do this. The process is as follow:
+
+1.  First, we define a custom summary fuction:
+
+```{r}
+library(caret)
+
+# Define a custom summary function to calculate RMSE and RSS
+rss_summary <- function(data, lev = NULL, model = NULL) {
+  # Calculate Residuals
+  residuals <- data$obs - data$pred
+  
+  # Calculate RSS
+  rss <- sum(residuals^2)
+  
+  # Calculate RMSE
+  rmse <- sqrt(mean(residuals^2))
+  
+  # Return as named vector
+  return(c(RMSE = rmse, RSS = rss))
+}
+```
+
+Now, we define the `trainControl` setting for the splits:
+
+```{r}
+# Define trainControl with repeated cross-validation
+train_control <- trainControl(
+  method = "LGOCV",             # Leave Group Out Cross-Validation (Monte Carlo CV)
+  number = 500,                 # Number of cross-validation iterations (k)
+  p = 0.7,                      # Proportion of data to be used for training in each iteration (70%)
+  summaryFunction = rss_summary,# Custom summary function
+  savePredictions = "final",    # Save the final predictions for each iteration
+  classProbs = FALSE,           # Not needed for regression
+  allowParallel = FALSE          # Turn off (or on) parallel processing
+)
+```
+
+Let's train the models!
+
+```{r}
+# Train Model A: Linear Regression
+set.seed(123)  # For reproducibility
+model_A <- train(
+  wage ~ age,
+  data = simulated_data,
+  method = "lm",
+  trControl = train_control,
+  metric = "RMSE"  # Primary metric to optimize
+)
+
+# Train Model B: Categorical Regression
+set.seed(123)  # For reproducibility
+model_B <- train(
+  wage ~ factor(age),
+  data = simulated_data,
+  method = "lm",
+  trControl = train_control,
+  metric = "RMSE"  # Primary metric to optimize
+)
+```
+
+We can then summarize the results:
+
+```{r}
+# Compare Models Using Resamples
+models_list <- list(Linear = model_A, Categorical = model_B)
+resamples_models <- resamples(models_list)
+
+# Summary of resampling metrics
+summary(resamples_models)
+
+# Boxplot of RMSE and RSS for both models
+bwplot(resamples_models, metric = c("RMSE", "RSS"))
+```
+
+We see that, as before, the linear model is better.
+
+# Cross Validation
+
+In the previous sections, we explored the **Validation Set Method** and **Stratified Sample Splitting** to evaluate our models' performance. While these approaches provide valuable insights, they have limitations, especially concerning variability introduced by a single train-test split. To obtain a more robust assessment of our models, we can employ **Cross-Validation (CV)** techniques. Cross-Validation systematically partitions the data into multiple training and validation sets, ensuring that every observation is used for both training and evaluation. This approach mitigates the bias and variance issues inherent in single splits.
+
+In this section, we will delve into two widely-used Cross-Validation methods:
+
+1.  **K-Fold Cross-Validation** (using a 10-fold example)
+
+2.  **Leave-One-Out Cross-Validation (LOOCV)**
+
+For each method, we will demonstrate how to implement it **manually** and using the **`caret`** package in R. This dual approach provides both foundational understanding and practical efficiency.
+
+------------------------------------------------------------------------
+
+## K-Fold Cross-Validation
+
+### Understanding K-Fold Cross-Validation
+
+**K-Fold Cross-Validation** is a resampling technique that divides the dataset into **K** equally sized folds (subsets). The model is trained on **K-1** folds and validated on the remaining fold. This process is repeated **K** times, with each fold serving as the validation set once. The results are then averaged to produce a single performance metric.
+
+**Advantages:** - **Efficient Use of Data:** Every observation is used for both training and validation.
+
+-   **Reduced Variance:** Multiple evaluations provide a more stable estimate of model performance.
+
+-   **Flexibility:** Suitable for various model types and dataset sizes.
+
+**Example Scenario:**
+
+Using **10-Fold Cross-Validation**, the dataset is partitioned into 10 folds. The model undergoes 10 training-validation cycles, each time holding out one unique fold for validation.
+
+### Implementing K-Fold Cross-Validation Manually
+
+To manually perform 10-Fold Cross-Validation, follow these steps:
+
+1.  **Partition the Data into 10 Folds**
+
+2.  **Iterate Over Each Fold:**
+
+    -   Use the current fold as the validation set.
+
+    -   Use the remaining folds as the training set.
+
+    -   Train models on the training set.
+
+    -   Predict and calculate RSS on the validation set.
+
+3.  **Aggregate the RSS Values Across Folds**
+
+```{r}
+# Number of folds
+K <- 10
+
+# Create fold assignments
+set.seed(123)  # For reproducibility of fold assignments
+folds <- sample(rep(1:K, length.out = n))  # Randomly assign each observation to a fold
+
+# Initialize vectors to store RSS for each fold
+rss_linear <- numeric(K)
+rss_categorical <- numeric(K)
+
+# Perform K-Fold Cross-Validation
+for(k in 1:K){
+  # Partition the data into training and validation sets
+  train_data <- simulated_data[folds != k, ]
+  validation_data <- simulated_data[folds == k, ]
+  
+  # Model A: Linear Regression
+  model_linear <- lm(wage ~ age, data = train_data)
+  predictions_linear <- predict(model_linear, validation_data)
+  rss_linear[k] <- sum((validation_data$wage - predictions_linear)^2)
+  
+  # Model B: Categorical Regression 
+  model_categorical <- lm(wage ~ factor(age), data = train_data)
+
+  # Predict and calculate RSS
+  predictions_categorical <- predict(model_categorical, validation_data)
+  
+  rss_categorical[k] <- sum((validation_data$wage - predictions_categorical)^2)
+}
+
+# Aggregate the RSS values
+average_rss_linear <- mean(rss_linear, na.rm = TRUE)
+average_rss_categorical <- mean(rss_categorical, na.rm = TRUE)
+
+# Display the results
+cat("K-Fold Cross-Validation Results (10-Fold):\n")
+cat("Average RSS for Linear Model:", average_rss_linear, "\n")
+cat("Average RSS for Categorical Model:", average_rss_categorical, "\n")
+```
+
+### Implementing K-Fold Cross-Validation with `caret`
+
+The `caret` package in R simplifies the Cross-Validation process by automating data partitioning, model training, and evaluation. Here's how to perform 10-Fold Cross-Validation using `caret`.
+
+```{r}
+
+# Define trainControl with 10-Fold Cross-Validation
+train_control_kfold <- trainControl(
+  method = "cv",                # Cross-Validation
+  number = 10,                  # Number of folds (10-Fold)
+  summaryFunction = rss_summary,# Custom summary function
+  savePredictions = "final",    # Save the final predictions for each fold
+  classProbs = FALSE,           # Not needed for regression
+  allowParallel = FALSE          
+)
+
+# Train Model A: Linear Regression using caret
+set.seed(123)  # For reproducibility
+model_A_caret <- train(
+  wage ~ age,
+  data = simulated_data,
+  method = "lm",
+  trControl = train_control_kfold,
+  metric = "RMSE"  # Primary metric to optimize
+)
+
+# Train Model B: Categorical Regression using caret
+set.seed(123)  # For reproducibility
+model_B_caret <- train(
+  wage ~ factor(age),
+  data = simulated_data,
+  method = "lm",
+  trControl = train_control_kfold,
+  metric = "RMSE"  # Primary metric to optimize
+)
+
+# Compare Models Using Resamples
+models_list_kfold <- list(Linear = model_A_caret, Categorical = model_B_caret)
+resamples_kfold <- resamples(models_list_kfold)
+
+# Summary of resampling metrics
+summary(resamples_kfold)
+
+# Boxplot of RMSE and RSS for both models
+bwplot(resamples_kfold, metric = c("RMSE", "RSS"))
+```
+
+## Leave-One-Out Cross-Validation (LOOCV)
+
+### Understanding Leave-One-Out Cross-Validation (LOOCV)
+
+**Leave-One-Out Cross-Validation (LOOCV)** is an extreme case of K-Fold Cross-Validation where **K equals the number of observations (n)**. In each iteration, one observation is used as the validation set, and the remaining **n-1** observations form the training set. This process is repeated **n** times, with each observation serving as the validation set exactly once.
+
+**Advantages:**
+
+-   **Maximal Use of Data:** Each training set includes almost the entire dataset.
+
+-   **Unbiased Performance Estimate:** Each model is tested on every single observation.
+
+-   **Suitable for Small Datasets:** Particularly beneficial when the dataset is limited in size.
+
+**Disadvantages:**
+
+-   **Computationally Intensive:** Especially with large datasets, as it requires **n** model trainings.
+
+-   **Variance:** The performance estimate can have high variance since each validation set consists of only one observation.
+
+### Implementing LOOCV Manually
+
+To manually perform LOOCV, follow these steps:
+
+1.  **Iterate Over Each Observation:**
+
+    -   Use the current observation as the validation set.
+
+    -   Use the remaining **n-1** observations as the training set.
+
+    -   Train models on the training set.
+
+    -   Predict and calculate RSS on the validation set.
+
+2.  **Aggregate the RSS Values Across All Observations**
+
+```{r}
+set.seed(123)
+
+# Initialize vectors to store RSS for each observation
+rss_linear_loocv <- numeric(n)
+rss_categorical_loocv <- numeric(n)
+
+# Perform LOOCV
+for(i in 1:n){
+  # Partition the data: all except the ith observation
+  train_data <- simulated_data[-i, ]
+  validation_data <- simulated_data[i, ]
+  
+  # Model A: Linear Regression
+  model_linear_loocv <- lm(wage ~ age, data = train_data)
+  prediction_linear_loocv <- predict(model_linear_loocv, validation_data)
+  rss_linear_loocv[i] <- (validation_data$wage - prediction_linear_loocv)^2
+  
+  # Model B: Categorical Regression with Explicit Levels
+  model_categorical_loocv <- lm(wage ~ factor(age), data = train_data)
+  
+  # Predict and calculate RSS
+  prediction_categorical_loocv <- predict(model_categorical_loocv, validation_data)
+  
+  rss_categorical_loocv[i] <- (validation_data$wage - prediction_categorical_loocv)^2
+}
+
+# Aggregate the RSS values
+average_rss_linear_loocv <- mean(rss_linear_loocv, na.rm = TRUE)
+average_rss_categorical_loocv <- mean(rss_categorical_loocv, na.rm = TRUE)
+
+# Display the results
+cat("Leave-One-Out Cross-Validation Results (LOOCV):\n")
+cat("Average RSS for Linear Model:", average_rss_linear_loocv, "\n")
+cat("Average RSS for Categorical Model:", average_rss_categorical_loocv, "\n")
+```
+
+### Implementing LOOCV with `caret`
+
+The **`caret`** package offers a streamlined approach to performing LOOCV. Here's how to execute LOOCV using `caret` for both models.
+
+```{r}
+
+# Define trainControl with LOOCV
+train_control_loocv <- trainControl(
+  method = "LOOCV",             # Leave-One-Out Cross-Validation
+  summaryFunction = rss_summary,# Custom summary function
+  savePredictions = "all",    # Save the final predictions for each iteration
+  classProbs = FALSE,           # Not needed for regression
+  allowParallel = FALSE         # Allow parallel processing if available
+)
+
+# Train Model A: Linear Regression using caret
+set.seed(123)  # For reproducibility
+model_A_caret_loocv <- train(
+  wage ~ age,
+  data = simulated_data,
+  method = "lm",
+  trControl = train_control_loocv,
+  metric = "RMSE"  # Primary metric to optimize
+)
+
+# Train Model B: Categorical Regression using caret
+set.seed(123)  # For reproducibility
+model_B_caret_loocv <- train(
+  wage ~ factor(age),
+  data = simulated_data,
+  method = "lm",
+  trControl = train_control_loocv,
+  metric = "RMSE"  # Primary metric to optimize
+)
+
+# Extract RSS values for Model A
+model_A_caret_loocv$results
+# Extract RSS values for Model B
+model_B_caret_loocv$results
+```
+
+Here, once again, we see that the linear model is proven to be the more accurate one.

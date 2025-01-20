@@ -1,0 +1,455 @@
+﻿Obs,Name,Gender,Fixed,Color,Heritage,Age,Weight
+1,Max,Male,Yes,Dark brown,"Designer/deliberate mix (e.g., labradoodles)",7,70
+2,Isla,Female,Yes,Black,Single breed,8,13
+3,Tyson,Male,No,Black,Mixed breed/unknown,0.33,
+4,Lexi,Female,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",6,24
+5,,Male,Yes,Light brown,Mixed breed/unknown,6,45
+6,Lola,Female,Yes,Black,Mixed breed/unknown,14,85
+7,Lady,Female,Yes,Black,Single breed,11,22
+8,Leo,Male,Yes,Reddish,Single breed,15,14
+9,Jitterbug,Female,Yes,Light brown,Mixed breed/unknown,18,25
+10,Coco,Female,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",3,44
+11,Jake,Male,No,White,Single breed,8,45
+12,Jessie,Female,Yes,Dark brown,Single breed,15,50
+13,Rikka,Female,No,Light brown,Single breed,14,30
+14,Yo-yo,Female,Yes,Light brown,Mixed breed/unknown,7,75
+15,Winston,Male,Yes,Black,Single breed,2,4.5
+16,Petey,Male,Yes,Yellow/blond,Mixed breed/unknown,15,27
+17,Doctor,Male,Yes,Light brown,Single breed,1.13,47
+18,Brownie,Female,Yes,Black,Mixed breed/unknown,1.5,45
+19,Cinnamon ,Female,Yes,Reddish,Single breed,12.5,25
+20,Sparky,Male,Yes,Black,Single breed,12.5,19
+21,Dexter,Male,Yes,Light brown,Single breed,12,25
+22,Yitzi,Female,Yes,Reddish,Single breed,0.58,13
+23,Maisie,Female,Yes,Reddish,Mixed breed/unknown,5,55
+24,Mya,Female,Yes,Other,Single breed,15,22
+25,Nala,Female,Yes,No primary color,Single breed,2.5,55
+26,Oso,Male,Yes,Black,Mixed breed/unknown,12.5,65
+27,Cesar,Male,Yes,Black,Mixed breed/unknown,4,11
+28,Chunka,Female,Yes,Black,Single breed,7,33
+29,Cody,Male,No,Reddish,Mixed breed/unknown,3,
+30,Cody Enzo,Male,Yes,Dark brown,"Designer/deliberate mix (e.g., labradoodles)",4,55
+31,Pepper,Female,Yes,Black,Single breed,2.25,26
+32,Chipper,Male,Yes,Black,Single breed,11,26
+33,Sammy,Female,Yes,Black,Single breed,10,30
+34,Trixie,Female,Yes,Black,Single breed,12,33
+35,Bo,Male,Yes,White,Mixed breed/unknown,11,19
+36,von Weiner's Petite Red Velvet,Female,Yes,Reddish,Single breed,17,15
+37,Oscar Meyer von Frankfurter,Male,Yes,Reddish,Single breed,6,15
+38,Babs,Female,Yes,White,Mixed breed/unknown,5,62
+39,Tala,Female,Yes,Black,Mixed breed/unknown,8,65
+40,Sadie ,Female,Yes,Black,Mixed breed/unknown,8,70
+41,Zoi,Female,Yes,Light brown,Mixed breed/unknown,11,20
+42,Suzy,Female,Yes,Other,Mixed breed/unknown,7,80
+43,Rossi,Male,Yes,White,Mixed breed/unknown,1,30
+44,Wyatt ,Male,Yes,No primary color,Mixed breed/unknown,0.42,20
+45,Noodle,Female,Yes,White,Single breed,8,25
+46,Bean,Male,Yes,Black,Single breed,2,30
+47,Grady,Male,Yes,Other,Mixed breed/unknown,12,72
+48,Tess,Female,Yes,Reddish,Mixed breed/unknown,2,70
+49,Piper,Female,Yes,Other,Mixed breed/unknown,3,1.5
+50,Dixie,Female,Yes,Yellow/blond,Mixed breed/unknown,12,50
+51,Sabot,Male,Yes,White,Mixed breed/unknown,7,75
+52,Sansa,Female,Yes,Black,Single breed,4,68
+53,Henry,Male,Yes,Dark brown,Mixed breed/unknown,7,24
+54,Dudley,Male,Yes,Black,"Designer/deliberate mix (e.g., labradoodles)",12,85
+55,Penny,Female,Yes,Reddish,"Designer/deliberate mix (e.g., labradoodles)",2,60
+56,Cortana,Female,Yes,Reddish,Single breed,8,45
+57,Bentley,Male,No,Yellow/blond,Single breed,2,30
+58,Minnie,Female,No,Reddish,Single breed,2,
+59,Luke Skywoofer,Male,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",6,37.4
+60,Hugo,Male,Yes,Dark brown,Single breed,3,70
+61,Beckett,Female,Yes,Dark brown,Single breed,2,93
+62,Cassius,Male,Yes,Black,Mixed breed/unknown,1.33,62
+63,Diesel,Male,Yes,Black,Mixed breed/unknown,9,50
+64,Sabrina ,Female,Yes,Reddish,Mixed breed/unknown,12,31
+65,Linus,Male,Yes,White,Single breed,13,16
+66,Ralph,Male,Yes,Black,Single breed,7,83
+67,Aristotle,Male,Yes,Yellow/blond,Mixed breed/unknown,3,40
+68,Millie,Female,Yes,Yellow/blond,Single breed,0.75,50
+69,Ruby,Female,Yes,Yellow/blond,Mixed breed/unknown,3,50
+70,Bernard,Male,Yes,Black,Mixed breed/unknown,7,38
+71,Salju,Male,Yes,White,Mixed breed/unknown,1.16,48
+72,Tyson,Male,Yes,No primary color,Single breed,1.08,50
+73,Mobie,Male,Yes,Black,Mixed breed/unknown,8,5
+74,Lola,Female,Yes,Yellow/blond,Mixed breed/unknown,3,13
+75,Scout,Male,Yes,White,Mixed breed/unknown,2,35
+76,Azul,Male,Yes,Black,Mixed breed/unknown,0.58,50
+77,Banana ,Male,Yes,Black,Mixed breed/unknown,0.5,30
+78,Plum,Female,Yes,Light brown,Mixed breed/unknown,0.46,12
+79,Rampage Jackson,Male,Yes,Black,Single breed,14,24
+80,Bingo,Male,Yes,Light brown,Single breed,3,20
+81,Luna,Female,No,Yellow/blond,Single breed,5,51
+82,Lambeaux ,Male,Yes,Light brown,Mixed breed/unknown,12,65
+83,Daisy,Female,Yes,Black,Mixed breed/unknown,14,60
+84,Nacho,Male,Yes,Black,Mixed breed/unknown,13,30
+85,Polo,Male,Yes,Black,Mixed breed/unknown,6,66
+86,Rosie,Female,Yes,Black,Single breed,4,65
+87,Molly,Female,Yes,Black,Mixed breed/unknown,16,20
+88,Rufus,Male,Yes,Yellow/blond,Single breed,5,95
+89,Jacob,Male,Yes,Yellow/blond,Mixed breed/unknown,10,
+90,Tate,Male,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",9,50
+91,Apple,Female,Yes,White,Single breed,3,15
+92,Henry,Male,Yes,White,Single breed,6,16
+93,Apollo,Male,Yes,Black,Mixed breed/unknown,6,165
+94,Winston ,Male,Yes,Reddish,"Designer/deliberate mix (e.g., labradoodles)",6,145
+95,Lun,Female,Yes,Yellow/blond,Single breed,5,24
+96,Murray,Male,Yes,Light brown,Single breed,4,25
+97,Daphne,Female,Yes,No primary color,"Designer/deliberate mix (e.g., labradoodles)",4,28
+98,Jax,Male,Yes,Yellow/blond,"Designer/deliberate mix (e.g., labradoodles)",3,19
+99,Murphy,Male,Yes,Black,Mixed breed/unknown,5,50
+100,Hank,Male,No,Other,Single breed,3,135
+101,Addy,Female,Yes,Black,Mixed breed/unknown,14,20
+102,Duke,Male,Yes,Black,Mixed breed/unknown,4,50
+103,Frank,Male,Yes,No primary color,Mixed breed/unknown,11,38
+104,Whistler,Female,Yes,Black,Mixed breed/unknown,11,25
+105,Reyka,Female,Yes,Yellow/blond,Mixed breed/unknown,3,55
+106,Shannon ,Female,Yes,Light brown,Single breed,2,50
+107,Sterling ,Male,Yes,White,Single breed,6,32
+108,Malory ,Female,Yes,Light brown,Single breed,2,45
+109,Ivy ,Female,Yes,Black,Single breed,2,27
+110,Layla,Female,Yes,White,Mixed breed/unknown,13,70
+111,Jemma,Female,Yes,Dark brown,Single breed,12,85
+112,Sadie,Female,Yes,Reddish,Single breed,16,18
+113,Theodore ,Male,Yes,White,Single breed,8,144
+114,Daisy,Female,Yes,Light brown,Single breed,7,145
+115,Theo,Male,No,White,Mixed breed/unknown,0.83,
+116,Lucy,Female,Yes,Light brown,Mixed breed/unknown,7,45
+117,Pumpkin,Female,Yes,Reddish,Mixed breed/unknown,4,45
+118,Neri,Female,Yes,White,Mixed breed/unknown,9,40
+119,Winston,Male,Yes,White,"Designer/deliberate mix (e.g., labradoodles)",3,35
+120,Frankie,Male,No,Light brown,"Designer/deliberate mix (e.g., labradoodles)",0.5,22
+121,Oliver,Male,Yes,Reddish,Mixed breed/unknown,13,15
+122,Murphy,Male,Yes,White,Single breed,0.75,16
+123,Lucy,Female,Yes,Light brown,Single breed,9,56
+124,Mik,Male,Yes,Black,Single breed,10,56
+125,Bash,Male,Yes,Light brown,Single breed,6,33
+126,Kaycee,Female,Yes,Dark brown,Single breed,2,28
+127,Chiqui,Female,Yes,Reddish,Mixed breed/unknown,12,8
+128,Jack,Male,Yes,White,Mixed breed/unknown,12,25
+129,Hope,Female,Yes,Dark brown,Mixed breed/unknown,18,30
+130,Ellie,Female,Yes,Dark brown,Mixed breed/unknown,5.5,38
+131,Sierra,Female,Yes,Other,Mixed breed/unknown,11.5,40
+132,Franklin Benjamin,Male,Yes,Light brown,Mixed breed/unknown,6,30
+133,Mr. Bentley Beans,Male,Yes,White,Mixed breed/unknown,10,20
+134,Willow,Female,Yes,White,"Designer/deliberate mix (e.g., labradoodles)",3,36
+135,Mad Dog,Male,No,Black,Single breed,4,15
+136,Mongo,Male,Yes,Black,Mixed breed/unknown,8,117
+137,Cyrax,Male,No,Dark brown,Single breed,2,90
+138,Duke,Male,Yes,White,Single breed,6,5
+139,Waffles ,Female,Yes,Yellow/blond,Mixed breed/unknown,2,75
+140,Merle,Male,Yes,Light brown,Mixed breed/unknown,1,35
+141,Nena,Female,Yes,Other,Mixed breed/unknown,2.5,40
+142,Harley,Female,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",12,150
+143,Maggie,Female,Yes,Black,Mixed breed/unknown,5,60
+144,Chloe,Female,Yes,White,Single breed,11.5,35
+145,Bear,Female,Yes,Other,Single breed,17,14
+146,Rosco ,Male,Yes,No primary color,Single breed,15,14
+147,Calix ,Male,Yes,Black,Single breed,14.75,65
+148,Leukos,Male,Yes,White,Single breed,10.5,50
+149,Demetri,Male,Yes,Black,Mixed breed/unknown,9.5,95
+150,Callie,Female,Yes,Other,Single breed,7.5,47
+151,Legend ,Male,Yes,Dark brown,Mixed breed/unknown,4,85
+152,Bo,Male,Yes,Yellow/blond,Single breed,13,70
+153,Charlie,Female,Yes,Yellow/blond,Mixed breed/unknown,4.5,60
+154,Milo ,Male,Yes,No primary color,Single breed,4,45
+155,Bexar,Male,Yes,Reddish,Single breed,5,60
+156,Charlie ,Male,Yes,No primary color,Single breed,6,30
+157,Sonny ,Male,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",1,4
+158,George,Male,Yes,Reddish,Single breed,2,60
+159,Maisy,Female,Yes,Yellow/blond,"Designer/deliberate mix (e.g., labradoodles)",2,70
+160,Jaxson,Male,Yes,Reddish,Single breed,11,65
+161,Paxton,Male,No,Yellow/blond,"Designer/deliberate mix (e.g., labradoodles)",12,5.6
+162,Galen,Female,Yes,Black,Single breed,9.5,120
+163,Cody,Female,Yes,Reddish,Mixed breed/unknown,14.5,50
+164,Ollie,Male,Yes,Black,Mixed breed/unknown,1,40
+165,Ruby,Female,Yes,Yellow/blond,Mixed breed/unknown,2.5,50
+166,Mufasa,Male,Yes,Black,Mixed breed/unknown,8,83
+167,Stella,Female,Yes,Dark brown,Mixed breed/unknown,0.25,15
+168,Mojo,Male,Yes,Black,Mixed breed/unknown,13,35
+169,Maya,Female,Yes,Yellow/blond,Mixed breed/unknown,12,45
+170,Shayna,Female,Yes,Black,Single breed,11,65
+171,Eli,Male,Yes,Reddish,Single breed,10,60
+172,Fenway,Male,Yes,Light brown,Mixed breed/unknown,14.5,
+173,Marvel,Male,Yes,Black,Single breed,8.5,42
+174,Izzy,Female,Yes,White,Mixed breed/unknown,12,55
+175,Kiara,Female,No,Black,Mixed breed/unknown,13,53
+176,Maya,Female,No,Black,Mixed breed/unknown,7,50
+177,Rudy,Male,Yes,White,Single breed,12,11
+178,Beemo,Male,No,White,Single breed,1,
+179,Diamond,Female,Yes,Other,Single breed,14,55
+180,Legion,Male,No,Black,Single breed,11,60
+181,Lucy,Female,Yes,Other,Mixed breed/unknown,5,60
+182,Copper,Female,Yes,Light brown,Mixed breed/unknown,3,40
+183,Honey,Female,Yes,Dark brown,Mixed breed/unknown,8,40
+184,Luci,Female,Yes,Black,Mixed breed/unknown,6,48
+185,Yoda,Male,Yes,Black,Single breed,10,7
+186,Pepper,Female,Yes,Light brown,Single breed,12,10
+187,,Female,Yes,Reddish,"Designer/deliberate mix (e.g., labradoodles)",13,25
+188,Emma,Female,Yes,Dark brown,Single breed,14,27
+189,Dobby,Male,Yes,Black,Mixed breed/unknown,11,60
+190,Simba ,Male,Yes,Light brown,Mixed breed/unknown,5,83
+191,Tyson,Male,Yes,Yellow/blond,Mixed breed/unknown,5,65
+192,Remy,Female,Yes,White,Mixed breed/unknown,13,42
+193,Sabrina,Female,Yes,Light brown,Mixed breed/unknown,11,75
+194,Wrinks ,Male,Yes,Black,"Designer/deliberate mix (e.g., labradoodles)",13,27
+195,Ila ,Female,Yes,Yellow/blond,Mixed breed/unknown,9,74.8
+196,Aero,Male,Yes,White,"Designer/deliberate mix (e.g., labradoodles)",12,37
+197,Boeing ,Male,No,Yellow/blond,Single breed,5,75.2
+198,Blue,Female,Yes,Other,Single breed,13,52.8
+199,Lula,Female,Yes,Light brown,Mixed breed/unknown,6,36
+200,Izzy,Female,Yes,Light brown,Mixed breed/unknown,3,42
+201,Mozey,Female,Yes,Dark brown,Mixed breed/unknown,2.5,
+202,Theo,Male,Yes,Dark brown,Mixed breed/unknown,3.5,75
+203,Lacy,Female,Yes,Light brown,Single breed,9,6
+204,Q,Male,Yes,Black,Single breed,7,100
+205,Vesper ,Female,Yes,Black,Mixed breed/unknown,1,50
+206,Rocky,Male,Yes,Yellow/blond,Mixed breed/unknown,8,68
+207,Dewey,Male,Yes,Dark brown,Single breed,10,13
+208,Pumpkin,Female,Yes,Black,Mixed breed/unknown,2,48
+209,Hudson,Male,Yes,White,Mixed breed/unknown,4,88
+210,Chloe,Female,Yes,Black,Single breed,14,54
+211,Phoebe ,Female,Yes,Light brown,Mixed breed/unknown,7,63
+212,Pippa ,Female,Yes,Black,Mixed breed/unknown,1,53.6
+213,Charlie,Male,Yes,White,"Designer/deliberate mix (e.g., labradoodles)",3.5,25
+214,Seamus Finnigan,Male,Yes,Light brown,Mixed breed/unknown,2,50
+215,Penny,Female,Yes,No primary color,Single breed,1,25
+216,Blue Beetle,Male,Yes,No primary color,Single breed,1,25
+217,Jagger,Male,Yes,Dark brown,Single breed,7,80
+218,Magnolia,Female,Yes,Yellow/blond,Single breed,3,85
+219,Nari,Male,Yes,Reddish,Mixed breed/unknown,11.75,40
+220,Calu,Male,Yes,Black,Mixed breed/unknown,2.6,70
+221,Scout,Female,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",6,20
+222,Casey ,Female,Yes,Reddish,Mixed breed/unknown,16,19.36
+223,Rowan,Female,Yes,White,Single breed,15,40
+224,Sienna,Female,Yes,Dark brown,Single breed,10,72
+225,Belly,Female,Yes,Dark brown,Single breed,11,80
+226,Friday ,Female,Yes,Black,Mixed breed/unknown,3,48
+227,Umber,Female,Yes,Dark brown,Single breed,1.5,42
+228,Mitzvah,Female,Yes,White,Mixed breed/unknown,14,15
+229,Freya,Female,No,Yellow/blond,Single breed,0.5,85
+230,Chaya,Female,Yes,White,Single breed,10,12.5
+231,Molly,Female,Yes,Yellow/blond,Single breed,11,110
+232,Maggie,Female,Yes,White,Single breed,13,18
+233,Max,Male,Yes,Black,Single breed,11,25
+234,Dylan,Male,Yes,Black,Single breed,9,75
+235,Mikey,Male,Yes,No primary color,Mixed breed/unknown,4,50
+236,Miss Abigail’s sunshine,Female,Yes,Light brown,Single breed,12,90
+237,Miya,Female,Yes,Black,Mixed breed/unknown,10,40
+238,Lena,Female,Yes,Dark brown,Mixed breed/unknown,4,20
+239,Roxy,Female,Yes,Light brown,Mixed breed/unknown,14,30
+240,Bella,Female,Yes,Other,Mixed breed/unknown,2,50
+241,Nikita,Female,Yes,Light brown,Mixed breed/unknown,3,50
+242,Velvet,Female,Yes,Black,Mixed breed/unknown,16,30
+243,Buster,Male,Yes,Dark brown,Mixed breed/unknown,11,178
+244,Bella,Female,Yes,Light brown,Mixed breed/unknown,2,65
+245,Akira,Female,Yes,White,Mixed breed/unknown,3,20
+246,Quinn,Female,Yes,Black,Mixed breed/unknown,12,45
+247,Hunter,Male,Yes,No primary color,Mixed breed/unknown,15,42
+248,Nutmeg,Female,Yes,White,Mixed breed/unknown,7,40
+249,Addie Mae,Female,Yes,Black,Mixed breed/unknown,3,50
+250,Leo,Male,Yes,White,Mixed breed/unknown,2.5,18
+251,Bessie,Female,Yes,Yellow/blond,Single breed,13,65
+252,Sherlock,Female,Yes,Black,Mixed breed/unknown,3,50
+253,Eva,Female,Yes,Reddish,Mixed breed/unknown,14,70
+254,Nalla,Female,Yes,White,Single breed,10,96
+255,Lady,Female,Yes,Black,Single breed,1,70
+256,Ella,Female,Yes,Black,Mixed breed/unknown,6,64
+257,Charlie ,Male,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",2,15.4
+258,Nimble,Male,Yes,White,Single breed,10,11
+259,,Male,Yes,Light brown,Single breed,2,30
+260,Max,Male,Yes,Light brown,Single breed,2,30
+261,Nina,Female,Yes,Reddish,Mixed breed/unknown,1,40
+262,Shelley,Female,Yes,Other,"Designer/deliberate mix (e.g., labradoodles)",8,45
+263,Maggie,Female,Yes,White,Mixed breed/unknown,12,22
+264,Bailey,Male,No,Reddish,"Designer/deliberate mix (e.g., labradoodles)",0.42,28
+265,Korra,Female,Yes,White,Mixed breed/unknown,4,50
+266,Zeus,Male,Yes,Black,Mixed breed/unknown,4,75
+267,Finnick ,Male,Yes,Dark brown,Mixed breed/unknown,3.5,75
+268,Homer,Male,Yes,Black,Mixed breed/unknown,13,35
+269,Oliver,Male,Yes,Black,Mixed breed/unknown,5,52
+270,Lily,Female,Yes,Black,Mixed breed/unknown,8,72
+271,Emmitt,Male,Yes,Black,"Designer/deliberate mix (e.g., labradoodles)",4,22
+272,Jumbo,Male,Yes,White,Mixed breed/unknown,8,5
+273,Odin,Male,Yes,Black,Mixed breed/unknown,12.75,113
+274,Dino,Male,Yes,Yellow/blond,Mixed breed/unknown,1.5,120
+275,Stella,Female,Yes,Yellow/blond,Single breed,8,75
+276,Bonnie,Female,Yes,Black,Mixed breed/unknown,5,60
+277,Gracie,Female,Yes,Reddish,Single breed,3,30
+278,Clementine,Female,Yes,White,"Designer/deliberate mix (e.g., labradoodles)",2,11
+279,Oliver ,Male,Yes,Other,Mixed breed/unknown,11,22
+280,Sandy,Female,Yes,Light brown,Mixed breed/unknown,7,65
+281,Cal,Male,Yes,Dark brown,Mixed breed/unknown,5,49
+282,Kiera,Female,Yes,Yellow/blond,Single breed,10,75
+283,Kona,Female,Yes,Black,Mixed breed/unknown,7,45
+284,Walter,Male,Yes,White,Mixed breed/unknown,6.5,19
+285,Clyde,Male,Yes,White,Mixed breed/unknown,6.5,18
+286,Izzy,Female,Yes,Black,Single breed,4,63.8
+287,Zoey,Female,Yes,White,Single breed,17,
+288,Bindi,Female,Yes,Yellow/blond,"Designer/deliberate mix (e.g., labradoodles)",3,30
+289,Loki,Male,Yes,Other,Mixed breed/unknown,5,39.6
+290,Brownie,Male,Yes,Black,Mixed breed/unknown,6,77
+291,Lea,Female,Yes,Dark brown,Mixed breed/unknown,3,77
+292,Penny,Female,Yes,Other,Mixed breed/unknown,3,19.8
+293,Zoey,Female,Yes,Black,Mixed breed/unknown,8,25
+294,Darla,Female,Yes,Yellow/blond,Single breed,14,57
+295,Frida,Female,No,Light brown,Mixed breed/unknown,1.5,
+296,Boone,Male,Yes,Black,Mixed breed/unknown,5,55
+297,Artie,Male,Yes,White,Mixed breed/unknown,2,60
+298,Pele,Male,Yes,Black,Mixed breed/unknown,12,25
+299,Lua,Female,Yes,Yellow/blond,Mixed breed/unknown,11,25
+300,Rio,Male,Yes,White,"Designer/deliberate mix (e.g., labradoodles)",3,94
+301,Posey,Female,Yes,White,Mixed breed/unknown,2,18
+302,,Female,Yes,Reddish,Mixed breed/unknown,6,30
+303,,Female,Yes,Yellow/blond,Mixed breed/unknown,11,60
+304,,Male,Yes,No primary color,Single breed,7,6
+305,Geezer,Male,Yes,Reddish,Mixed breed/unknown,15,16
+306,Minnie,Female,Yes,Black,Mixed breed/unknown,14,17
+307,Swiffer,Male,Yes,Yellow/blond,Mixed breed/unknown,18,16
+308,Fiona,Female,Yes,Yellow/blond,Mixed breed/unknown,9,27
+309,Batman,Male,Yes,Dark brown,Single breed,12,20
+310,Olive,Female,Yes,Black,Mixed breed/unknown,3,37
+311,Ladybug,Female,Yes,Black,Mixed breed/unknown,3,17
+312,Mijo,Male,Yes,Dark brown,Single breed,4,20
+313,Zeus,Male,Yes,White,Single breed,3,101
+314,Khaleesi ,Female,Yes,Black,"Designer/deliberate mix (e.g., labradoodles)",1.5,6.4
+315,,Female,Yes,Black,Single breed,2.5,45
+316,Cadie ,Female,Yes,Light brown,Mixed breed/unknown,2.5,48
+317,Lotus ,Female,No,Light brown,Single breed,5,44
+318,Nut,Female,Yes,Light brown,Single breed,14,77
+319,Loba,Female,Yes,Black,Mixed breed/unknown,7,50
+320,Rigby,Female,Yes,Black,Mixed breed/unknown,13.92,35
+321,Sugar,Female,Yes,Black,Single breed,6.5,75
+322,Jabbers,Male,Yes,Light brown,Mixed breed/unknown,15,72
+323,George,Male,Yes,White,Mixed breed/unknown,3.5,70
+324,Penny,Female,Yes,Black,Mixed breed/unknown,7,50
+325,Hulk smash ,Male,Yes,White,Single breed,3,42
+326,Maverick ,Male,Yes,Reddish,Mixed breed/unknown,9,65
+327,Holden,Male,Yes,Light brown,Mixed breed/unknown,2,45
+328,Fred,Male,Yes,Black,Mixed breed/unknown,12,66
+329,Norm,Male,Yes,Black,Single breed,10,99
+330,Rizzo,Female,Yes,White,"Designer/deliberate mix (e.g., labradoodles)",8,56
+331,Gobi,Male,Yes,White,Mixed breed/unknown,4,14
+332,Kirby,Female,Yes,Yellow/blond,Single breed,12,70
+333,Lucy,Female,Yes,Light brown,Mixed breed/unknown,13,50
+334,Sasha,Female,Yes,No primary color,Single breed,8,100
+335,Mandy,Female,Yes,Black,Single breed,14,20
+336,Mello,Male,Yes,White,Single breed,7,97
+337,Bella,Female,Yes,Light brown,Mixed breed/unknown,12,28.6
+338,Bugzee,Male,Yes,No primary color,"Designer/deliberate mix (e.g., labradoodles)",17,8.6
+339,Zoey,Female,Yes,Yellow/blond,Mixed breed/unknown,3,39
+340,Sushi,Female,Yes,Light brown,Mixed breed/unknown,13,40
+341,Pickles,Female,Yes,Dark brown,Mixed breed/unknown,1,60
+342,Rusty,Male,Yes,No primary color,Mixed breed/unknown,2,17.6
+343,Zima ,Female,Yes,Other,Single breed,2,95
+344,Skit,Female,Yes,White,Single breed,13,10
+345,Harley,Female,Yes,White,Mixed breed/unknown,0.42,33
+346,Gio,Male,Yes,White,"Designer/deliberate mix (e.g., labradoodles)",13,24
+347,Sully,Male,Yes,White,Mixed breed/unknown,8,35
+348,Bailey,Male,Yes,Yellow/blond,Single breed,5,65
+349,Nellie ,Female,Yes,Yellow/blond,Mixed breed/unknown,10,25
+350,Coco,Female,Yes,Yellow/blond,Mixed breed/unknown,5,20
+351,Stella,Female,Yes,Reddish,Single breed,6,53
+352,Lizzi,Female,Yes,Light brown,Single breed,3,22
+353,Clint Eastdog ,Male,Yes,Reddish,Single breed,3,75
+354,Hershey,Female,Yes,Dark brown,Single breed,6,50
+355,Perrla,Female,Yes,Yellow/blond,Mixed breed/unknown,12,55
+356,Cabra,Female,Yes,White,Single breed,6,60
+357,Hazel,Female,Yes,Other,Single breed,8,65
+358,Raoule Wallenbark,Female,Yes,Black,"Designer/deliberate mix (e.g., labradoodles)",13,45
+359,Katie,Female,Yes,White,Mixed breed/unknown,6,10
+360,Lucy,Female,Yes,Black,Single breed,2,38
+361,Abbey,Female,Yes,Black,Single breed,13,20
+362,Lacey,Female,Yes,Black,Mixed breed/unknown,6,35
+363,Fred,Male,Yes,No primary color,Single breed,6,32
+364,Percy ,Male,Yes,White,Mixed breed/unknown,5,12
+365,Moose,Male,Yes,Dark brown,Single breed,3,88
+366,,Female,Yes,No primary color,Single breed,0.66,18
+367,Dozer,Male,Yes,White,Single breed,7,125
+368,Emma,Female,Yes,Dark brown,Single breed,9,72
+369,Elwood,Male,Yes,Black,Single breed,5,28
+370,PJ,Male,Yes,Reddish,Single breed,10,8
+371,Maggie,Female,Yes,White,Mixed breed/unknown,2,35
+372,Lucy,Female,Yes,Black,Single breed,15,30
+373,Daisy,Female,Yes,Light brown,Single breed,12,30
+374,Princess,Female,Yes,Black,Mixed breed/unknown,11,16
+375,,Male,Yes,Light brown,Single breed,5,25
+376,Dexter,Male,Yes,Black,Single breed,13,26
+377,Belle,Female,Yes,Yellow/blond,Single breed,15.5,78
+378,Tiki,Male,Yes,Light brown,"Designer/deliberate mix (e.g., labradoodles)",14,40
+379,Tuck,Male,Yes,Other,Single breed,4,25
+380,Lilly,Female,Yes,Dark brown,Mixed breed/unknown,5,43
+381,Tuffy,Male,Yes,Black,Single breed,12,75
+382,Princess Leia,Female,Yes,Light brown,Mixed breed/unknown,3,60
+383,Lily,Female,Yes,No primary color,Single breed,3,19
+384,Joey,Male,Yes,Dark brown,Mixed breed/unknown,7,55
+385,Olive,Female,Yes,No primary color,Single breed,1,17
+386,Eleanor,Female,Yes,No primary color,Single breed,10,20
+387,Dixie,Female,Yes,Black,Single breed,12,16
+388,Sullivan,Male,Yes,Reddish,Single breed,8,23
+389,Ash,Female,Yes,Other,Mixed breed/unknown,10,45
+390,Gracie,Female,Yes,Black,Mixed breed/unknown,8,55
+391,Winston,Male,Yes,Other,Single breed,8,42
+392,Greta,Female,Yes,Light brown,Mixed breed/unknown,1.5,70
+393,Oliver,Male,Yes,Black,Single breed,8,30
+394,Indy ,Male,Yes,Dark brown,Single breed,9,14
+395,Jupiter ,Male,Yes,Black,Single breed,8,85
+396,Calla,Female,Yes,White,Mixed breed/unknown,2.5,100
+397,Mars,Male,Yes,White,Mixed breed/unknown,2,40
+398,Lainie,Female,Yes,Black,Mixed breed/unknown,4,23
+399,Franklin,Male,Yes,Other,Single breed,10,22
+400,Pixie,Female,Yes,Light brown,Single breed,6,6
+401,Cody,Male,Yes,Reddish,Single breed,8,22
+402,Cooper,Male,No,No primary color,Single breed,0.5,
+403,Wicket,Female,Yes,Black,Mixed breed/unknown,11,60
+404,Elinor,Female,Yes,White,Mixed breed/unknown,4,45
+405,Nova,Male,Yes,No primary color,Single breed,1.5,28
+406,Tessa,Female,Yes,No primary color,Single breed,7,18
+407,Dunkin’,Male,Yes,No primary color,Single breed,6,42
+408,Sophie ,Female,Yes,No primary color,Mixed breed/unknown,6,
+409,Day-Z,Female,Yes,White,Mixed breed/unknown,16,30
+410,,Female,Yes,White,Single breed,6.5,28
+411,,Male,Yes,Dark brown,Single breed,14,80
+412,,Female,Yes,Dark brown,Single breed,14,55
+413,Daisy,Female,Yes,White,Single breed,14,23
+414,Ruby,Female,Yes,Black,Single breed,12,22
+415,Boone,Male,Yes,White,Single breed,13,
+416,Belle,Female,Yes,Black,Single breed,13,23
+417,Orville,Male,Yes,Reddish,Mixed breed/unknown,5,80
+418,Bohdi,Male,Yes,Light brown,Mixed breed/unknown,3,50
+419,Odin,Male,Yes,Light brown,Mixed breed/unknown,3,45
+420,Emma,Female,Yes,Yellow/blond,Single breed,11,26
+421,Katie,Female,Yes,Light brown,Single breed,14,19
+422,Molly,Female,Yes,White,Single breed,2,20
+423,Chingy,Male,Yes,White,Single breed,1.5,7.5
+424,Finch,Male,Yes,Light brown,Single breed,6,29
+425,DASH!,Male,Yes,Other,Mixed breed/unknown,10,85
+426,Rooney,Male,Yes,Black,Single breed,13,80
+427,Jake,Male,Yes,No primary color,Single breed,5,150
+428,Otis,Male,No,Yellow/blond,Mixed breed/unknown,0.25,12.4
+429,Roxy,Female,No,No primary color,Mixed breed/unknown,0.25,12.25
+430,Ghost,Male,Yes,White,Mixed breed/unknown,3.5,33
+431,Khaleesi,Female,Yes,Black,Mixed breed/unknown,10,60
+432,Padfoot,Female,No,White,Mixed breed/unknown,8,30
+433,Rixs,Female,Yes,Other,Mixed breed/unknown,16,8.9
+434,Calvin,Male,Yes,Dark brown,Single breed,2.5,
+435,Max,Male,Yes,Dark brown,Single breed,9,29
+436,Lady,Female,Yes,Dark brown,Single breed,9.75,31.5
+437,Tommy,Male,Yes,No primary color,Single breed,5,29
+438,Ursula,Female,Yes,Other,Single breed,6,110
+439,Merritt,Male,Yes,Light brown,Single breed,9,55
+440,Dovi,Female,Yes,Light brown,Single breed,2,5.5
+441,Scooby,Female,Yes,Yellow/blond,Single breed,13,80
+442,Frida,Female,Yes,Dark brown,Mixed breed/unknown,6,60
+443,Jynx,Female,Yes,Black,Mixed breed/unknown,3.5,85
+444,Thanda,Male,Yes,Black,Mixed breed/unknown,8,55
+445,Scooby,Male,Yes,Yellow/blond,Mixed breed/unknown,6,24
+446,Casius,Male,Yes,Dark brown,Mixed breed/unknown,12,21
+447,Edie,Female,Yes,Reddish,Mixed breed/unknown,12,30
+448,Trixie ,Female,Yes,Light brown,Single breed,7,15
+449,Kirby,Male,Yes,White,Mixed breed/unknown,13,45
+450,Lola B,Female,Yes,Light brown,Single breed,16,22
+451,Lola B,Female,Yes,Light brown,Single breed,16,22
+452,Lexie,Female,Yes,Black,Mixed breed/unknown,2.5,55
+453,Sophie,Female,Yes,Light brown,Mixed breed/unknown,8,80
+454,Harley ,Male,Yes,Black,Mixed breed/unknown,9,75

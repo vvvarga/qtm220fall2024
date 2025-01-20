@@ -1,0 +1,769 @@
+---
+title: "Lab 10"
+author: "F. Nguyen"
+date: " 07 Nov 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Classical Regression: Extended Tutorial
+
+In this lab session, we will review and extend some important concepts of classical regression through a new example. We will use the `CASchools` data from the `AER` package. This dataset contains observations from all 420 K-6 and K-8 districts in California with data available for 1998 and 1999. Test scores are on the Stanford 9 standardized test administered to 5th-grade students. School characteristics (averaged across the district) include enrollment, number of teachers (measured as "full-time equivalents"), number of computers per classroom, and expenditures per student.
+
+Demographic variables for the students are averaged across the district. The demographic variables include the percentage of students in the public assistance program CalWorks (formerly AFDC), the percentage of students that qualify for a reduced-price lunch, and the percentage of students that are English learners (that is, students for whom English is a second language).
+
+```{r}
+library(AER)
+library(tidyverse)
+data("CASchools")
+head(CASchools)
+```
+
+First, let's create a variable `score` that is the average of `math` and `read` scores. Additionally, we will create a binary variable `esl` indicating whether the school district has a large ESL student base (i.e., if the percentage of English learners is larger than 30%), and a binary variable `lowincome` indicating if the district's income is below the average:
+
+```{r}
+CASchools$score <- (CASchools$math + CASchools$read) / 2
+CASchools$esl <- ifelse(CASchools$english > 30, 1, 0)
+CASchools$lowincome <- ifelse(CASchools$income < mean(CASchools$income), 1, 0)
+```
+
+## Simple Linear Regression
+
+Let's start by examining the relationship between students' performance and the percentage of students in the CalWorks program. We'll perform a simple linear regression of `score` on `calworks`:
+
+```{r}
+mod.simple <- lm(score ~ calworks, data = CASchools)
+summary(mod.simple)
+```
+
+Unsurprisingly, the higher the percentage of the district received public assistance, the lower performance, since this means more students come from disadvantaged backgrounds (**Note that this does NOT mean the public assistance program leads to lower performance**, i.e., not **causal**).
+
+**Interpretation:**
+
+-   **Intercept**: The intercept represents the expected score when `calworks` is zero. In our case, the intercept is approximately 667.97, which is the estimated average test score for a district with 0% of students in the CalWorks program.
+
+-   **Slope**: The slope coefficient for `calworks` is approximately -1.04, indicating that for each additional percentage point in CalWorks participation, the average test score decreases by 1.04 points.
+
+-   **Statistical Significance**: The p-value for the `calworks` coefficient is very small (less than 0.001), suggesting that the relationship is statistically significant.
+
+-   **R-squared**: The R-squared value is around 0.39, meaning that approximately 39% of the variability in test scores is explained by the percentage of CalWorks participation.
+
+### Confidence Intervals for Coefficients
+
+We can calculate the 95% confidence intervals for the coefficients:
+
+```{r}
+confint(mod.simple, level = 0.95)
+```
+
+**Interpretation:**
+
+-   The 95% confidence interval for the `calworks` coefficient is approximately (-1.17, -.92), indicating that we are 95% confident that the true relationship of `calworks` on `score` lies within this range. Thus, the correlation is significant.
+
+We can also get the CI with other ranges:
+
+```{r}
+confint(mod.simple, level = 0.90)
+```
+
+### Plotting the Regression Line
+
+Now, let's visualize the relationship by plotting the data and the regression line.
+
+First, compute the predicted scores:
+
+```{r}
+CASchools$predicted_score_simple <- predict(mod.simple)
+```
+
+Plot the data and the regression line:
+
+```{r}
+ggplot(CASchools, aes(x = calworks, y = score)) +
+  geom_point(alpha = 0.5) +
+  geom_line(aes(y = predicted_score_simple), color = "blue", size = 1) +
+  theme_minimal() +
+  labs(title = "Regression of Score on CalWorks", x = "CalWorks (%)", y = "Score")
+```
+
+### Plotting Residuals
+
+To visualize the residuals (the differences between the observed and predicted values), we can add vertical lines from each data point to the regression line:
+
+```{r}
+ggplot(CASchools, aes(x = calworks, y = score)) +
+  geom_point(alpha = 0.5) +
+  geom_line(aes(y = predicted_score_simple), color = "blue", size = 1) +
+  geom_segment(aes(x = calworks, xend = calworks, y = score, yend = predicted_score_simple), color = "red", alpha = 0.3) +
+  theme_minimal() +
+  labs(title = "Regression of Score on CalWorks with Residuals", x = "CalWorks (%)", y = "Score")
+```
+
+**Interpretation:**
+
+-   The red vertical lines represent the residuals. Larger residuals indicate observations that are not well explained by the model.
+
+-   The plot shows that while the model captures the general negative trend, there is still considerable variation around the regression line.
+
+-   Here, we also see that the variance in residuals varies with `calworks`, which means the homoscedasticity assumption is likely not met (we will discuss the diagnostics further next lab).
+
+## Multiple Regression with `calworks` and `esl`
+
+Now, let's extend our model to include the `esl` variable:
+
+```{r}
+mod.1 <- lm(score ~ calworks + esl, data = CASchools)
+summary(mod.1)
+```
+
+**Interpretation:**
+
+-   **Intercept**: The intercept (approximately 668.77) represents the expected score for districts with `calworks = 0` and `esl = 0` (i.e., districts with no CalWorks participation and low ESL percentages).
+
+-   **CalWorks Coefficient**: The coefficient for `calworks` is approximately -0.8, slightly less negative than in the simple regression. This suggests that controlling for `esl`, each additional percentage point in CalWorks participation is associated with a 0.8-point decrease in average test score.
+
+-   **ESL Coefficient**: The coefficient for `esl` is approximately -18.69, indicating that districts with high ESL percentages (greater than 30%) have average test scores that are 18.69 points lower than districts with low ESL percentages, holding `calworks` constant.
+
+-   **Statistical Significance**: Both coefficients are statistically significant with p-values less than 0.001.
+
+-   **Adjusted R-squared**: The adjusted R-squared value is around 0.53, meaning that approximately 53% of the variability in test scores is explained by the model, an improvement over the simple regression.
+
+We can plot this:
+
+```{r}
+# Create prediction data
+cal_seq <- seq(min(CASchools$calworks), max(CASchools$calworks), length.out = 100)
+pred_data <- expand.grid(
+  calworks = cal_seq,
+  esl = c(0, 1)
+)
+# Generate predictions
+pred_data$predicted_score <- predict(mod.1, newdata = pred_data)
+# Plot
+ggplot(data = CASchools, aes(x = calworks, y = score, color = factor(esl))) + 
+  geom_point(alpha = 0.2, size = 1) +
+  geom_line(data = pred_data, aes(x = calworks, y = predicted_score, color = factor(esl)), size = 1) +
+  theme_bw() +
+  labs(color = "ESL", x = "CalWorks (%)", y = "Score")
+```
+
+**Interpretation:**
+
+-   The plot shows two lines corresponding to `esl = 0` and `esl = 1`.
+-   Districts with high ESL percentages (`esl = 1`) have consistently lower predicted scores across all levels of `calworks`.
+-   The negative slope indicates that higher CalWorks participation is associated with lower test scores, regardless of ESL status.
+
+## Matrix Form
+
+Recall, from previous labs, that we can estimate the coefficients above using matrix notation:
+
+$$
+\widehat{\beta} = (\mathbf{X}^{T}\mathbf{X})^{-1}\mathbf{X}^{T}\mathbf{y}
+$$
+
+```{r}
+X <- as.matrix(cbind(1, CASchools$calworks, CASchools$esl))
+y <- as.matrix(CASchools$score)
+beta <- solve(t(X) %*% X) %*% t(X) %*% y
+beta
+```
+
+**Interpretation:**
+
+-   The coefficients obtained match those from the `lm()` function, confirming that our calculations are correct.
+
+We can then perform inference using the matrix form of the covariance-variance matrix:
+
+$$
+\hat{\Sigma}_{\beta} = (\mathbf{X}^{\prime} \mathbf{X})^{-1}\hat{\sigma}^2_{\varepsilon}
+$$
+
+First, we get the residuals:
+
+```{r}
+y_hat <- X %*% beta
+e <- y - y_hat
+```
+
+Now, we can show that $\mathbf{X}^{\prime} \mathbf{e} = 0$:
+
+```{r}
+t(X) %*% e
+```
+
+Finally, we can get the covariance-variance matrix:
+
+```{r}
+n <- nrow(CASchools)
+k <- ncol(X)
+s2 <- sum(e^2) / (n - k)  # Corrected estimate of variance
+Sigma <- s2 * solve(t(X) %*% X)
+Sigma
+```
+
+We can get the square root of the diagonal to obtain the standard errors:
+
+```{r}
+SE <- sqrt(diag(Sigma))
+SE
+```
+
+We can then get the confidence intervals (CIs) as usual:
+
+```{r}
+UB <- beta[,1] + qt(0.975, df = n - k) * SE
+LB <- beta[,1] - qt(0.975, df = n - k) * SE
+data.frame(Estimate = beta[,1], Std.Error = SE, Lower = LB, Upper = UB)
+```
+
+**Interpretation:**
+
+-   The standard errors and confidence intervals match those from the regression output, verifying our manual calculations.
+-   The confidence intervals provide the range within which we are 95% confident that the true coefficients lie.
+
+## Partial Regression/FWL
+
+We can obtain the same coefficient for `calworks` using partial simple regressions, based on the **Frisch-Waugh-Lovell (FWL) theorem**.
+
+### Understanding the FWL Theorem
+
+The FWL theorem states that in a multiple regression model, the coefficient of a variable can be obtained by:
+
+1.  Regressing the variable of interest on the other independent variables and obtaining the residuals.
+2.  Regressing the dependent variable on the residuals from step 1.
+3.  The coefficient from this regression is the same as the coefficient of the variable of interest in the full multiple regression model.
+
+This process effectively "partial out" the effects of other variables, isolating the unique contribution of the variable of interest.
+
+### Applying the FWL Theorem to Our Data
+
+**Step 1: Regress `calworks` on `esl` and obtain residuals**
+
+We first regress `calworks` on `esl` to remove the influence of `esl` from `calworks`.
+
+```{r}
+step1 <- lm(calworks ~ esl, data = CASchools)
+CASchools$e_calworks <- step1$residuals
+```
+
+**Interpretation:**
+
+-   The residuals `e_calworks` represent the part of `calworks` that is uncorrelated with `esl`.
+-   By removing the variation in `calworks` that is explained by `esl`, we isolate the unique variation in `calworks`.
+
+We can show that the residuals are uncorrelated (orthogonal) to `esl`:
+
+```{r}
+cor(CASchools$esl, CASchools$e_calworks)
+```
+
+**Interpretation:**
+
+-   The correlation is effectively zero, confirming that `e_calworks` is orthogonal to `esl`.
+
+**Step 2: Regress `score` on the residuals `e_calworks`**
+
+We now regress `score` on the residuals from step 1.
+
+```{r}
+step2 <- lm(score ~ e_calworks, data = CASchools)
+summary(step2)
+```
+
+**Interpretation:**
+
+-   The coefficient of `e_calworks` in this regression is approximately -0.8, which matches the coefficient of `calworks` in the multiple regression model `mod.1`.
+-   This confirms that the effect of `calworks` on `score`, controlling for `esl`, is captured by this two-step process.
+
+**Comparing with the Original Multiple Regression**
+
+```{r}
+mod.1$coefficients[2]  # Coefficient of calworks in mod.1
+```
+
+**Conclusion:**
+
+-   The coefficients are the same, demonstrating the FWL theorem in practice.
+-   This method shows how the effect of one variable can be isolated by removing the influence of other variables.
+
+### Extending to Other Variables
+
+We can follow the same process to obtain the coefficient for `esl`.
+
+**Step 1: Regress `esl` on `calworks` and obtain residuals**
+
+```{r}
+step1_esl <- lm(esl ~ calworks, data = CASchools)
+CASchools$e_esl <- step1_esl$residuals
+```
+
+**Step 2: Regress `score` on the residuals `e_esl`**
+
+```{r}
+step2_esl <- lm(score ~ e_esl, data = CASchools)
+summary(step2_esl)
+```
+
+**Interpretation:**
+
+-   The coefficient of `e_esl` matches the coefficient of `esl` in the multiple regression model `mod.1`.
+-   This confirms that the effect of `esl` on `score`, controlling for `calworks`, is captured by this two-step process.
+
+**Conclusion:**
+
+-   The FWL theorem provides a powerful tool for understanding the unique contributions of each variable in a multiple regression model.
+-   It demonstrates how controlling for other variables affects the estimated relationships.
+
+## Interaction Terms
+
+As we can see from the plot above, it seems that the slopes for ESL vs. non-ESL districts might be different. We can allow for this with the interaction term:
+
+```{r}
+mod.2 <- lm(score ~ calworks * esl, data = CASchools)
+summary(mod.2)
+```
+
+**Interpretation:**
+
+-   **Interaction Term**: The coefficient for `calworks:esl` is approximately 0.7, suggesting that the negative effect of `calworks` on `score` is less severe in high ESL districts.
+
+-   **Adjusted R-squared**: The adjusted R-squared has increased slightly to around 0.57, indicating a marginal improvement in model fit.
+
+-   **Coefficients**:
+
+    -   For non-ESL districts (`esl = 0`), the relationship between `calworks` and `score` is given by the `calworks` coefficient (\~ -1.03).
+
+    -   For ESL districts (`esl = 1`), the slope is `calworks` coefficient plus the interaction term (`-1.03 + 0.71 = -0.33`).
+
+-   **Interpretation**: This means that in ESL districts, the negative impact of CalWorks participation on test scores is less pronounced compared to non-ESL districts.
+
+We can plot this as:
+
+```{r}
+# Create prediction data
+cal_seq <- seq(min(CASchools$calworks), max(CASchools$calworks), length.out = 100)
+pred_data <- expand.grid(
+  calworks = cal_seq,
+  esl = c(0, 1)
+)
+# Generate predictions
+pred_data$predicted_score <- predict(mod.2, newdata = pred_data)
+# Plot
+ggplot(data = CASchools, aes(x = calworks, y = score, color = factor(esl))) + 
+  geom_point(alpha = 0.2, size = 1) +
+  geom_line(data = pred_data, aes(x = calworks, y = predicted_score, color = factor(esl)), size = 1) +
+  theme_bw() +
+  labs(color = "ESL", x = "CalWorks (%)", y = "Score")
+```
+
+**Interpretation:**
+
+-   The plot shows that the slope of the relationship between `calworks` and `score` is steeper (more negative) for non-ESL districts compared to ESL districts.
+
+-   This suggests that the negative relationship between CalWorks participation on test scores is more pronounced in districts with fewer ESL students. One way to interpret this is that the effect of wealth on test score is less pronounced in districts with more immigrants.
+
+## F-Test
+
+From the regression results, we know that the *difference in slope between the two groups* is statistically significant. However, that alone does NOT tell us if the slope for ESL districts is statistically significant, as this slope is $\beta_1 + \beta_3$. In order to test for this, we have to conduct an F-test, i.e., linear hypothesis test. As in previous labs, this is done with `linearHypothesis()` from the `car` package:
+
+```{r}
+library(car)
+linearHypothesis(mod.2, "calworks + calworks:esl = 0")
+```
+
+**Interpretation:**
+
+-   The null hypothesis is that the combined effect of `calworks` and the interaction term (`calworks + calworks:esl`) is zero for ESL districts.
+
+-   The p-value is less than 0.01, so we reject the null hypothesis, concluding that the slope for `calworks` in ESL districts is statistically significant.
+
+-   This means that even in ESL districts, `calworks` has a significant negative effect on `score`.
+
+## Prediction and Confidence Intervals
+
+From previous labs, we can plot the confidence intervals (CIs) and prediction intervals (PIs). First, we generate new data for predictions:
+
+```{r}
+# New data for predictions
+newdata <- with(CASchools, expand.grid(calworks = seq(min(calworks), max(calworks), length.out = 100),
+                                       esl = c(0, 1)))
+```
+
+Generate predictions:
+
+```{r}
+# Generate predictions
+preds <- predict(mod.2, newdata, interval = "confidence") 
+preds_pred <- predict(mod.2, newdata, interval = "prediction")
+```
+
+Combine into a dataframe:
+
+```{r}
+# Combine with newdata
+newdata$fit <- preds[, "fit"]
+newdata$lower_conf <- preds[, "lwr"]
+newdata$upper_conf <- preds[, "upr"]
+newdata$lower_pred <- preds_pred[, "lwr"]
+newdata$upper_pred <- preds_pred[, "upr"]
+```
+
+Plotting:
+
+```{r}
+# Plot
+ggplot(CASchools, aes(x = calworks, y = score)) + 
+  geom_point(aes(color = factor(esl)), alpha = 0.5) + 
+  geom_line(data = newdata, aes(x = calworks, y = fit, color = factor(esl))) + 
+  geom_ribbon(data = newdata, aes(x = calworks, y = fit,
+                                  ymin = lower_conf, ymax = upper_conf, fill = factor(esl)), alpha = 0.4) + 
+  geom_ribbon(data = newdata, aes(x = calworks, y = fit,
+                                  ymin = lower_pred, ymax = upper_pred, fill = factor(esl)), alpha = 0.2) +
+  scale_color_manual(values = c("blue", "red")) +
+  scale_fill_manual(values = c("lightblue", "pink")) +
+  labs(color = "ESL", fill = "ESL", x = "CalWorks (%)", y = "Score") +
+  theme_minimal()
+```
+
+**Interpretation:**
+
+-   The shaded areas represent the confidence and prediction intervals.
+
+-   The confidence interval (darker shade) shows the uncertainty around the *estimated mean score* for a given `calworks` and `esl` value pair.
+
+-   The prediction interval (lighter shade) shows the range where new observations are likely to fall.
+
+-   The intervals are wider for higher values of `calworks`, indicating increased uncertainty.
+
+## Robust Inference with the `sandwich` Package
+
+In regression analysis, one of the key assumptions is **homoscedasticity** (constant variance of the error term). However, in real-world data, this assumption is often violated, leading to **heteroscedasticity**. When heteroskedasticity is present, the standard errors obtained from the usual OLS estimation are inconsistent, which can lead to incorrect inferences. To address this issue, we can use **robust standard errors**.
+
+To obtain robust standard errors, we use the `sandwich` package:
+
+```{r}
+library(sandwich)
+```
+
+Compute the robust covariance matrix:
+
+```{r}
+# Robust covariance matrix
+robust_vcov <- vcovHC(mod.2, type = "HC1")
+```
+
+We can then obtain the robust standard errors and t-tests:
+
+```{r}
+library(lmtest)
+coeftest(mod.2, vcov = robust_vcov)
+```
+
+Alternatively, we can update the summary of the model with robust standard errors:
+
+```{r}
+# Original standard errors
+summary(mod.2)$coefficients[, "Std. Error"]
+
+# Robust standard errors
+robust_se <- sqrt(diag(robust_vcov))
+robust_se
+```
+
+### Full summary table with robust SEs:
+
+First, determine the degrees of freedom and the critical value from the t-distribution:
+
+```{r}
+# Degrees of freedom
+df_resid <- mod.2$df.residual
+
+# Critical value from t-distribution for 95% confidence level
+crit_val <- qt(0.975, df = df_resid)
+```
+
+Now, calculate the confidence intervals:
+
+```{r}
+# Coefficient estimates
+coef_estimates <- coef(mod.2)
+
+# Confidence intervals
+conf_lower <- coef_estimates - crit_val * robust_se
+conf_upper <- coef_estimates + crit_val * robust_se
+```
+
+Calculate the t-values and p-values using the robust standard errors:
+
+```{r}
+# t-values
+t_values <- coef_estimates / robust_se
+
+# p-values
+p_values <- 2 * pt(-abs(t_values), df = df_resid)
+```
+
+Combine all the information into a data frame:
+
+```{r}
+# Summary table
+summary_table <- data.frame(
+  Estimate = coef_estimates,
+  `Robust SE` = robust_se,
+  `t value` = t_values,
+  `Pr(>|t|)` = p_values,
+  `CI Lower` = conf_lower,
+  `CI Upper` = conf_upper
+)
+
+# Round for better presentation
+summary_table <- round(summary_table, 4)
+summary_table
+```
+
+#### Stargazer
+
+If you want to add the robust confidence intervals to the existing regression summary, you can modify the `summary()` output or create a custom summary table.
+
+Here's how you might incorporate the robust standard errors and confidence intervals into a regression table using the `stargazer` package for presentation:
+
+```{r}
+# Install and load stargazer 
+# install.packages("stargazer")
+library(stargazer)
+
+# Original standard errors
+orig_se <- summary(mod.2)$coefficients[, "Std. Error"]
+
+# Original confidence intervals
+ci_original <- confint(mod.2)
+
+# Use stargazer to produce a regression table
+stargazer(mod.2, mod.2, se = list(orig_se, robust_se), 
+          ci = TRUE, 
+          ci.custom = list(ci_original, cbind(conf_lower, conf_upper)), 
+          type = "text",
+          column.labels = c("Original SEs", "Robust SEs"),
+          keep.stat = c("n", "rsq", "adj.rsq"))
+```
+
+**Note:** The `stargazer` function allows you to specify custom standard errors and confidence intervals. By setting `ci = TRUE` and providing `ci.custom`, you can include the robust confidence intervals in the table.
+
+In the output:
+
+-   **Original SEs (Column 1)**: Shows the standard errors and confidence intervals from the original model summary.
+-   **Robust SEs (Column 2)**: Shows the robust standard errors and confidence intervals computed using the `sandwich` package.
+
+## Bootstrap Inference
+
+Another way to obtain more reliable inference without relying on the usual assumptions is to use **bootstrap methods**. Bootstrap inference allows us to estimate the sampling distribution of an estimator by resampling with replacement from the data. In previous labs, we have done this manually. Today, we are going to explore how to do this with `boot` package:
+
+First, load the `boot` package:
+
+```{r}
+library(boot)
+```
+
+Define a function to compute the coefficients:
+
+```{r}
+boot_fn <- function(data, indices) {
+  # Resample data
+  d <- data[indices, ]
+  # Fit the model
+  fit <- lm(score ~ calworks * esl, data = d)
+  # Return coefficients
+  return(coef(fit))
+}
+```
+
+Now, perform the bootstrap with a specified number of replications:
+
+```{r}
+set.seed(123)  # For reproducibility
+boot_results <- boot(data = CASchools, statistic = boot_fn, R = 1000)
+```
+
+We can look at the bootstrap estimates:
+
+```{r}
+boot_results
+```
+
+Compute bootstrap standard errors:
+
+```{r}
+boot_se <- apply(boot_results$t, 2, sd)
+boot_se
+```
+
+Compare bootstrap standard errors with the original ones:
+
+```{r}
+# Original standard errors
+summary(mod.2)$coefficients[, "Std. Error"]
+
+# Bootstrap standard errors
+boot_se
+```
+
+**Interpretation:**
+
+-   The bootstrap standard errors provide an alternative estimate of variability.
+
+-   Comparing bootstrap SEs with original SEs helps assess the robustness of our results.
+
+-   If the bootstrap SEs are similar to the original ones, it suggests that our inference is reliable.
+
+We can also obtain bootstrap confidence intervals:
+
+```{r}
+# For calworks coefficient
+boot.ci(boot_results, type = "perc", index = 2)
+# For esl coefficient
+boot.ci(boot_results, type = "perc", index = 3)
+# For interaction coefficient
+boot.ci(boot_results, type = "perc", index = 4)
+```
+
+## Polynomial Regressions
+
+So far, we have assumed a linear relationship between `calworks` and `score`. However, the relationship may not be strictly linear. We can use **polynomial regression** to capture potential nonlinearities.
+
+### Quadratic Regression
+
+First, let's include a squared term for `calworks`:
+
+```{r}
+mod.poly <- lm(score ~ calworks + I(calworks^2) + esl, data = CASchools)
+summary(mod.poly)
+```
+
+**Interpretation:**
+
+-   **Quadratic Term**: The coefficient for `I(calworks^2)` is significant and positive (\~0.003), suggesting a nonlinear relationship.
+-   **CalWorks Coefficient**: The negative coefficient for `calworks` and positive coefficient for `I(calworks^2)` indicate a U-shaped relationship.
+-   **Adjusted R-squared**: The adjusted R-squared has increased slightly, indicating a better fit compared to the linear model.
+-   This suggests that the negative impact of `calworks` on `score` diminishes at higher levels of `calworks`.
+
+### Visualization
+
+Let's visualize the quadratic relationship. Create a sequence of `calworks` values for prediction:
+
+```{r}
+# Create prediction data
+cal_seq <- seq(min(CASchools$calworks), max(CASchools$calworks), length.out = 100)
+
+```
+
+Create new data frames for predictions for `esl = 0` and `esl = 1`:
+
+```{r}
+pred_data <- expand.grid(
+  calworks = cal_seq,
+  esl = c(0, 1)
+)
+# Generate predictions
+pred_data$predicted_score <- predict(mod.poly, newdata = pred_data)
+```
+
+Plot the data and fitted curves:
+
+```{r}
+# Plot
+ggplot(data = CASchools, aes(x = calworks, y = score, color = factor(esl))) + 
+  geom_point(alpha = 0.2, size = 1) +
+  geom_line(data = pred_data, aes(x = calworks, y = predicted_score, color = factor(esl)), size = 1) +
+  theme_bw() +
+  labs(color = "ESL", x = "CalWorks (%)", y = "Score")
+```
+
+**Interpretation:**
+
+-   The curves show a U-shaped pattern, with the lowest scores at intermediate levels of `calworks`.
+
+-   This suggests that the negative impact of `calworks` decreases at higher levels, possibly due to additional support mechanisms in place for districts with very high CalWorks participation.
+
+### Higher-Order Polynomials
+
+We can also consider higher-order polynomials, such as cubic terms:
+
+```{r}
+mod.poly3 <- lm(score ~ calworks + I(calworks^2) + I(calworks^3) + esl, data = CASchools)
+summary(mod.poly3)
+```
+
+### Visualization
+
+Let's visualize the quadratic relationship. Create a sequence of `calworks` values for prediction:
+
+```{r}
+# Create prediction data
+cal_seq <- seq(min(CASchools$calworks), max(CASchools$calworks), length.out = 100)
+```
+
+Create new data frames for predictions for `esl = 0` and `esl = 1`:
+
+```{r}
+pred_data <- expand.grid(
+  calworks = cal_seq,
+  esl = c(0, 1)
+)
+# Generate predictions
+pred_data$predicted_score <- predict(mod.poly3, newdata = pred_data)
+```
+
+Plot the data and fitted curves:
+
+```{r}
+# Plot
+ggplot(data = CASchools, aes(x = calworks, y = score, color = factor(esl))) + 
+  geom_point(alpha = 0.2, size = 1) +
+  geom_line(data = pred_data, aes(x = calworks, y = predicted_score, color = factor(esl)), size = 1) +
+  theme_bw() +
+  labs(color = "ESL", x = "CalWorks (%)", y = "Score")
+```
+
+**Interpretation:**
+
+-   The cubic term is not statistically significant, suggesting that adding a cubic term does not improve the model substantially.
+-   The adjusted R-squared does not increase significantly compared to the quadratic model.
+-   Therefore, including higher-order terms beyond the quadratic may not be necessary.
+
+### Model Comparison
+
+We can compare models using **Adjusted R-squared** and **Akaike Information Criterion (AIC)**:
+
+```{r}
+# Adjusted R-squared
+adj_r2_mod2 <- summary(mod.2)$adj.r.squared
+adj_r2_poly <- summary(mod.poly)$adj.r.squared
+adj_r2_poly3 <- summary(mod.poly3)$adj.r.squared
+
+# AIC
+aic_mod2 <- AIC(mod.2)
+aic_poly <- AIC(mod.poly)
+aic_poly3 <- AIC(mod.poly3)
+
+# Compile results
+model_comparison <- data.frame(
+  Model = c("Linear Interaction", "Quadratic", "Cubic"),
+  Adjusted_R2 = c(adj_r2_mod2, adj_r2_poly, adj_r2_poly3),
+  AIC = c(aic_mod2, aic_poly, aic_poly3)
+)
+
+model_comparison
+```
+
+**Interpretation:**
+
+-   The quadratic model has a slightly higher adjusted R-squared and lower AIC compared to the linear interaction model, suggesting a better fit.
+-   Similarly, the cubic model offers some improvement over the quadratic one.
+-   Based on these metrics, the cubic model may be preferred.

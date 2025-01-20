@@ -1,0 +1,611 @@
+---
+title: "Lab 4: Variance and Estimators"
+author: "F. Nguyen"
+date: " 20 September 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Expectation of Random Variables (Continued)
+
+To continue from the previous lab, we will discuss expectations of random variables in more complicated scenario.
+
+## Sum of Random Variables
+
+For two random variables, the expectation of the sum is also the sum of two expectations:
+
+$$
+\mathbb{E}(X + Y) = \mathbb{E}(X) + \mathbb{E}(Y)
+$$
+
+For example, if we want to see the expected points from a roll of two fair 6D dices:
+
+```{r}
+set.seed(42)
+dices <- replicate(10000, sum(sample(1:6, 2, replace = T)))
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+Here, we see that the expectation is approximately 7, which is $3.5 + 3.5$. Let's try with a roll of 1 loaded 6D dice and 1 fair 6D dice:
+
+```{r}
+# PMF of loaded dice
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+
+set.seed(42)
+
+dices <- replicate(10000, sample(dice_faces, 1, replace = T, prob = loaded_dice_pmf) + # sample from loaded dice
+                     sample(1:6, 1)) # sample from normal dice
+
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+Here, the expected value is $7.6 = 4.1 + 3.5$, i.e. the sum of expected vaues of the loaded and normal dices. We can further show that:
+
+$$
+\mathbb{E}(aX + Y) = a\mathbb{E}(X) + \mathbb{E}(Y)
+$$
+
+By simulating rolls in scenarios where the loaded dice is given 2x the points:
+
+```{r}
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+
+set.seed(42)
+dices <- replicate(10000, 2*sample(dice_faces, 1, replace = T, prob = loaded_dice_pmf) + 
+                     sample(1:6, 1))
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+The same also applies to the expectation of the difference:
+
+$$
+\mathbb{E}(X - Y) = \mathbb{E}(X) - \mathbb{E}(Y)
+$$
+
+```{r}
+# PMF of loaded dice
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+
+set.seed(42)
+
+dices <- replicate(10000, sample(dice_faces, 1, replace = T, prob = loaded_dice_pmf) - # sample from loaded dice
+                     sample(1:6, 1)) # sample from normal dice
+
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+This is from $\mathbb{E}(X - Y) = \mathbb{E}(X) - \mathbb{E}(Y) = 4.1 - 3.5 = 0.6$.
+
+**Fun application:** You can use the simulation approach in R to quickly approximate more complicated distributions. For example, assume you are playing a board game that requires a sum of 13 points or more from a roll of 2 6D dices and one 8D dice to dodge an attack, and you want to know the probability of achieving this. You can use the following simulation (of 100,000 rolls):
+
+```{r}
+set.seed(42)
+# y = sum of two dices
+y <- replicate(100000, sample(1:6, 1) + sample(1:6, 1) + sample(1:8, 1))
+# percentage y >= 13
+mean(y >= 13)
+```
+
+We can see that you can approximately \$ 38.916%\$ of successfully dodging the attack. Here, if you calculate the probability manually, you will find that the answer is $\frac{7}{18} = 0.3888$, very close to what we got with simulation. More importantly, you can do this with trivially large $n$ number of dices, while deriving a formula for $n$ number of dices by hand is in fact very complicated.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Create the outcomes for each die
+dice_6d <- 1:6   # Outcomes for a 6-sided die
+dice_8d <- 1:8   # Outcomes for an 8-sided die
+
+# Generate all combinations of two 6D dice and one 8D dice
+outcomes <- expand.grid(dice_6d, dice_6d, dice_8d)
+
+# Sum the points for each
+outcomes$sum <- rowSums(outcomes)
+
+# Filter total points >= 13
+favorable_outcomes <- outcomes[outcomes$sum >= 13, ]
+
+# Calculate the probability
+total_outcomes <- nrow(outcomes) # 7
+favorable_outcomes_count <- nrow(favorable_outcomes) # 18
+probability <- favorable_outcomes_count / total_outcomes
+
+# Print the result
+probability
+```
+
+## Conditional expectation
+
+We can also demonstrate conditional expectation in R. Here, for example, if we have a 70% chance of having a fair dice, and 30% chance of having a loaded dice, we can simulate this by drawing twice:
+
+```{r}
+set.seed(42)
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+dices <- rep(NA, 10000)
+
+# Simulate the process
+for(i in 1:10000) {
+  X <- sample(0:1, 1, replace = T, prob = c(0.7, 0.3))
+  dices[i] <- ifelse(X == 1,
+                      sample(dice_faces, 1, replace = T, prob = loaded_dice_pmf),
+                      sample(1:6, 1))
+}
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+Here, we can see that the dice roll is conditioned on whether it is a loaded dice ($X = 1$), or a fair dice ($X = 0$). Here, we can see that the overall expected points is, by law of iterated expectation:
+
+$$
+\mathbb{E}(Y) = \mathbb{E}\left[\mathbb{E}(X|Y)\right] = p_X( 0)\mathbb{E}(Y | X = 0) + p_X(1)\mathbb{E}(Y | X = 1)
+$$
+
+Plugging in, we get:
+
+$$
+\mathbb{E}(Y) = 0.3*4.1 + 0.7*3.5 = 3.68
+$$
+
+# Variance of Random Variables
+
+## Definition
+
+Recall that the variance for a random variable $X$ is defined as:
+
+$$
+\sigma^2_X := \mathbb{E}[X - \mathbb{E}[X]]^2 =  \mathbb{E}[X^2] - \mathbb{E}[X]^2 =  \frac{1}{N}\sum_{i=1}^N (x_i - \mu)^2 
+$$
+
+Or, in continuous form:
+
+$$
+\sigma^2_X := \mathbb{E}[X - \mathbb{E}[X]]^2 =  \mathbb{E}[X^2] - \mathbb{E}[X]^2 =\int x^2 f(x)dx - \left(\int x f(x)dx \right)^2
+$$
+
+This (along with its square root, the standard deviation) is the measure of spread corresponds to the measure of location, expectation, that we discussed above. For example, let's return to our loaded dice:
+
+| Face | Probability |
+|------|-------------|
+| 1    | 0.05        |
+| 2    | 0.10        |
+| 3    | 0.15        |
+| 4    | 0.25        |
+| 5    | 0.30        |
+| 6    | 0.15        |
+
+```{r}
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+```
+
+We can calculate the variance of this as:
+
+```{r}
+e_x <- loaded_dice_pmf %*% dice_faces
+e_x_squared <- loaded_dice_pmf %*% (dice_faces^2)
+var_x <- e_x_squared - e_x^2
+var_x
+```
+
+Let's verify this with simulation:
+
+```{r}
+set.seed(42)
+dices <- replicate(100000, sample(dice_faces, 1, replace = T, 
+                                 prob = loaded_dice_pmf))
+var(dices)
+```
+
+We can see that the results are the same. We can show the same thing for continuous variables. For example, let's draw from $\mathcal{N}(2,4)$:
+
+```{r}
+set.seed(42)
+X <- rnorm(100000, 2, 2) #sqrt(4) = 2
+mean(X^2) - (mean(X))^2
+```
+
+Here, we see that the variance in our simulated distribution, calculated by the formula is approx. 4, same as defined.
+
+## Sum of Variances:
+
+Now, if we have two *independent* random variables, the variance of the sum is simply the sum of variances:
+
+$$
+Var(X + Y) = Var(X) + Var(Y)
+$$
+
+For example, assume $X \sim \mathcal{N}(2, 4)$ and $Y \sim \mathcal{U}(-1, 1)$. Here, the variance of X is simply 4, and for Y, we apply the uniform distribution variance formula:
+
+$$
+Var(Y) = \frac{1}{12}(1 - (-1))^2 = \frac{1}{3}
+$$
+
+Thus, we expect the simulated variance of the sum to be approximately $4 \frac{1}{3}$.
+
+```{r}
+set.seed(42)
+X <- rnorm(100000, 2, 2) #sqrt(4) = 2
+Y <- runif(100000, -1, 1)
+var(X + Y)
+```
+
+This is as we expected. Now, it is important to note that the above is only true when both variables are **independent** of each other. If they are not, the formula is:
+
+$$
+Var(X + Y) = Var(X) + Var(Y) + 2 Cov(X, Y)
+$$
+
+With the $Cov(X, Y)$ being the covariance of X and Y, defined as:
+
+$$
+Cov(X, Y) = \mathbb{E}[(X - \mathbb{E}[X])(Y - \mathbb{E}[Y])]
+$$
+
+::: callout-note
+## Variance and Covariance
+
+From the formula, we can easily see that $Var(X) = Cov(X, X)$, i.e. variance of a random variable is the covariance between that variable and itself.
+:::
+
+For example, let $Z = X + Y$. We know that in this case $X$ and $Z$ would not be independent. Thus:
+
+```{r}
+Z <- X + Y
+var(X + Z)
+var(X) + var(Z)
+```
+
+The variance of the sum is no long the sum of the variance. Let's plug the above formula in:
+
+```{r}
+var(X) + var(Z) + 2*cov(X, Z)
+```
+
+## Law of Total Variance
+
+The law of total variance states that:
+
+$$
+Var(Y) = \mathbb{E}[Var(Y|X)] + Var(\mathbb{E}[Y|X])
+$$
+
+Let's revisit the unknown 6D dice example above to demonstrate this. Assume we have a 70% chance of having a fair dice, and 30% chance of having a loaded dice:
+
+```{r}
+set.seed(42)
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+dices <- rep(NA, 100000)
+X_vec <-  rep(NA, 100000)
+# Simulate the process
+for(i in 1:100000) {
+  X <- sample(0:1, 1, replace = T, prob = c(0.7, 0.3))
+  X_vec[i] <- X
+  dices[i] <- ifelse(X == 1,
+                      sample(dice_faces, 1, replace = T, prob = loaded_dice_pmf),
+                      sample(1:6, 1))
+}
+var(dices)
+```
+
+Here, the variance of the points is 2.69. How did we get this? We can plug the formula above in:
+
+```{r}
+fair_dice_pmf <- c(1/6, 1/6, 1/6, 1/6, 1/6, 1/6)
+
+# Fair
+# E[Y|X = 0]
+E_fair <- fair_dice_pmf %*% dice_faces
+E_fair
+# Var[Y|X = 0]
+Var_fair <- fair_dice_pmf %*% (dice_faces^2) - E_fair^2
+Var_fair
+
+# Loaded
+# E[Y|X = 1]
+E_loaded  <- loaded_dice_pmf %*% dice_faces
+E_loaded
+# Var[Y|X = 1]
+Var_loaded <- loaded_dice_pmf %*% (dice_faces^2) - E_loaded^2
+Var_loaded
+
+# E[Var(Y|X)]
+E_of_Var <- 0.7*Var_fair + 0.3*Var_loaded
+E_of_Var
+
+# Var[E(Y|X)]
+
+## E[E(Y|X)]
+E_of_E <-  0.7*E_fair + 0.3*E_loaded
+
+## E[E(Y|X)^2]
+E_of_E_sq <- 0.7*E_fair^2 + 0.3*E_loaded^2
+
+##Var[E(Y|X)]
+
+Var_of_E <-E_of_E_sq - E_of_E^2
+Var_of_E
+
+# Var(X)
+Var_Y <- E_of_Var + Var_of_E
+Var_Y
+```
+
+# Estimators
+
+Now, we can use the expectation and variance above to evaluate various estimators. For example, let's revisit the Airbnb data:
+
+```{r}
+library(tidyverse)
+airbnb <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/austin_airbnb_july24.csv")
+```
+
+Previously, we use the sample mean estimator to approximate population mean:
+
+$$
+\bar{X} = \frac{1}{n} \sum_{i = 1}^n X_i
+$$
+
+Now, we now that the variance of this estimator is:
+
+$$
+Var(\bar{X}) = \frac{\sigma^2}{n}
+$$
+
+Of course, this is straightforward to derive analytically, but here, we will simulate the sampling distribution to show that it fits the formula:
+
+```{r}
+# mean
+mu <- mean(airbnb$price)
+mu
+# population SD
+n <- nrow(airbnb)
+sigma <- sqrt(var(airbnb$price)*((n - 1)/n))
+sigma
+```
+
+Let's use a n = 5000 sample:
+
+```{r}
+set.seed(42)
+#Save the sample mean
+n <- 50000
+x_bar <-  rep(NA, n)
+#Loop
+for(i in 1:n){
+  x_bar[i] <- mean(sample(airbnb$price, 5000, replace = T))
+}
+```
+
+We have:
+
+```{r}
+# E[X_bar^2] - (E[X_bar])^2
+mean(x_bar^2) - (mean(x_bar)^2)
+
+# sigma^2/n
+sigma^2/5000
+
+# var
+var(x_bar)
+```
+
+We can see that all these are approximately the same, proving our formula is correct. Now, we can also check the bias $\mathbb{E}[\bar{X}] - \mu$:
+
+```{r}
+mean(x_bar)
+mean(x_bar)- mu
+```
+
+As expected, the bias is approximately 0. Now, assume we have an alternative estimator of the mean:
+
+$$
+\tilde{X} = \frac{n}{(n - 100)^2} \sum_{i = 1}^n X_i
+$$
+
+We can see that expectation is $\mathbb{E}[\tilde{X}] = \frac{n^2}{(n - 100)^2} \mu$. We can derive the variance of this:
+
+\begin{align*}
+Var(\tilde{X}) &= Var(\frac{n}{(n - 1)^2} \sum_{i = 1}^n X_i)\\
+&= \frac{n^2}{(n - 100)^4)} \sum_{i = 1}^n Var(X_i)\\
+&= \frac{n^3}{(n - 100)^4} \sigma^2\\
+\end{align*}
+
+Now, we test this, first by simulating from the population:
+
+```{r}
+set.seed(42)
+
+# alt estimator
+alt.mean <- function(X){
+  n <- length(X)
+  return(sum(X)* (n/(n - 100)^2))
+}
+
+#Save the sample mean
+n <- 50000
+x_bar <-  rep(NA, n)
+x_tilde <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_temp <- sample(airbnb$price, 5000, replace = T)
+  x_bar[i] <- mean(sample_temp)
+  x_tilde[i] <- alt.mean(sample_temp)
+}
+```
+
+First, the expectation:
+
+```{r}
+mean(x_tilde)
+(5000^2)/(4900^2)*mu
+```
+
+Additionally, we can see that this estimator is very biased, and the biased is \$\mathbb{E}\[\tilde{X}\] - \mu = \frac{n^2}{(n - 100)^2} \mu - \mu = \frac{n^2 - (n - 100)^2 }{(n - 100)^2} \mu \$
+
+```{r}
+mean(x_tilde) - mu
+((5000^2 - 4900^2)/(4900^2))*mu
+```
+
+Then we can check our variance formula:
+
+```{r}
+(5000^3)/(4900^4)*sigma^2
+var(x_tilde)
+```
+
+The 95% range of the distribution is:
+
+```{r}
+quantile(x_tilde, c(0.025, 0.975))
+```
+
+We can plot this:
+
+```{r}
+ggplot(data = data.frame(x_tilde = x_tilde), aes(x = x_tilde)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mu, linetype="dashed", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(x_tilde), linetype="dotted", 
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(x_tilde, 0.025), 
+                   xmax = quantile( x_tilde, 0.975), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+Now, if we only have one sample:
+
+```{r}
+set.seed(42)
+
+oursample <- airbnb[sample(1:nrow(airbnb), 5000, replace = T),]
+```
+
+We can use the bootstrap to construct the confidence interval:
+
+```{r}
+set.seed(42)
+
+#Save the sample mean
+n <- 50000
+x_tilde.boot <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_temp <- sample(oursample$price, 5000, replace = T)
+  x_tilde.boot[i] <- alt.mean(sample_temp)
+}
+```
+
+The bootstrap variance of the estimator is:
+
+```{r}
+var(x_tilde.boot)
+```
+
+The bootstrap CI:
+
+```{r}
+quantile(x_tilde.boot, c(0.025, 0.975))
+```
+
+We see that the width of this CI is approximately the same as the simulated CI from population. We can plot it:
+
+```{r}
+ggplot(data = data.frame(x_tilde = x_tilde.boot), aes(x = x_tilde)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mu, linetype="dashed",
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(x_tilde.boot), linetype="dotted", 
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(x_tilde.boot, 0.025), 
+                   xmax = quantile( x_tilde.boot, 0.975), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+# Subsample Means
+
+Now, assume we want to compare the average price of listings by superhosts and normal hosts. We can get the true difference from the population data:
+
+```{r}
+superhost <- airbnb[airbnb$host_is_superhost == "t",]
+normalhost <- airbnb[airbnb$host_is_superhost == "f",]
+mean(superhost$price)
+mean(normalhost$price)
+mean(superhost$price) - mean(normalhost$price)
+```
+
+So from our population data, it turns out that superhosts charge on average \$86.2 less than normal hosts. What if we try to get this from our sample?
+
+```{r}
+superhost.sample <- oursample[oursample$host_is_superhost == "t",]
+normalhost.sample <- oursample[oursample$host_is_superhost == "f",]
+mean(superhost.sample$price)
+mean(normalhost.sample$price)
+mean(superhost.sample$price) - mean(normalhost.sample$price)
+```
+
+From the sample, the difference is \$117.3. We can construct the bootstrapped CI:
+
+```{r}
+set.seed(42)
+
+#Save the difference
+n <- 10000
+diff.boot <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_boot<-  oursample[sample(1:nrow(oursample), nrow(oursample), replace = T),]
+  superhost.boot <- sample_boot[sample_boot$host_is_superhost == "t",]
+  normalhost.boot  <- sample_boot[sample_boot$host_is_superhost == "f",]
+  diff.boot[i] <- mean(superhost.boot$price) - mean(normalhost.boot$price)
+}
+```
+
+The bootstrap CI of the difference is:
+
+```{r}
+quantile(diff.boot, c(0.025, 0.975))
+```
+
+We can plot this:
+
+```{r}
+ggplot(data = data.frame(diff = diff.boot), aes(x = diff)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(superhost$price) - mean(normalhost$price), linetype="dashed", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(superhost.sample$price) - mean(normalhost.sample$price), linetype="dotted",
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(diff.boot, 0.025), 
+                   xmax = quantile(diff.boot, 0.975), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```

@@ -1,0 +1,825 @@
+---
+title: "Lab 8 - OLS Part II"
+author: "F. Nguyen"
+date: " 24 Oct 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Multiple Linear Regression
+
+In the previous lab, we have examined how to estimate a linear regression model with Ordinary Least squares estimator in **simple linear regression** case, with only one predictor. In today's lab, we will expand on that to the case of **multiple linear regression**, for cases with multiple predictors.
+
+## A Basic Example
+
+First, let's start by loading the data. Here, we use the same CPS data as in Lab 2. You can find this under Modules \> Lab 2 on Canvas. As before, we load the data and apply some modification:
+
+```{r}
+library(tidyverse)
+cps <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/cps.csv")
+cps$wage <- cps$earnings/(cps$week*cps$hours)
+cps <- cps[cps$education <= 16,]
+cps$marital <- ifelse(cps$marital <= 2, 1, 0)
+```
+
+To demonstrate a basic multiple linear regression, let's estimate the following model:
+
+$$
+Wage_i = \beta_0 + \beta_1 Age_i + \beta_2 CollegeDegree_i + \varepsilon_i
+$$
+
+As before, in R, we can estimate this with `lm()` as:
+
+```{r}
+mod.1 <- lm(wage ~ age + factor(college_degree), cps)
+summary(mod.1)
+```
+
+Recall from previous lab, we can also estimate the coefficients manually using OLS matrix form $\mathbf{(X^T X)^{-1}X^T y}$:
+
+```{r}
+X <- cbind(1, cps$age, cps$college_degree)
+y <- cps$wage
+beta <- solve(t(X)%*%X)%*%t(X)%*%y
+beta
+```
+
+So how do we interpret this result? As before, $\beta_0$ is the average predicted `wage` if other variables are 0, i.e. predicted `wage` of a person with `age = 0` and no `college degree`. Similarly, $\beta_1$ is the expected marginal difference in `wage` between persons with 1 unit difference in `age`. Here, however, this interpretation is **conditional on `college_degree` stays the same**. We can test this:
+
+```{r}
+predict(mod.1, newdata = data.frame(age = 21, college_degree = 0)) - predict(mod.1, newdata = data.frame(age = 20, college_degree = 0))
+
+predict(mod.1, newdata = data.frame(age = 21, college_degree = 1)) - predict(mod.1, newdata = data.frame(age = 20, college_degree = 0))
+```
+
+From the above results, in the first comparison, the expected difference in `wage` is $\beta_1 = 0.218$ for two persons aged 21 and 20 without college degrees. However, in the second comparison, the difference is much more than $\beta_1$. This is because in this comparison, the first person has a college degree. In fact, we can see that:
+
+```{r}
+predict(mod.1, newdata = data.frame(age = 21, college_degree = 1)) - predict(mod.1, newdata = data.frame(age = 20, college_degree = 0))
+
+#beta1 + beta2
+mod.1$coefficients[2] + mod.1$coefficients[3]
+```
+
+As we can see, $\beta_3$ is the expected difference in `wage` between a person with and without a college degree, *conditional on `age` being the same*.
+
+```{r}
+predict(mod.1, newdata = data.frame(age = 21, college_degree = 1)) -
+  predict(mod.1, newdata = data.frame(age = 21, college_degree = 0))
+
+predict(mod.1, newdata = data.frame(age = 50, college_degree = 1)) -
+  predict(mod.1, newdata = data.frame(age = 50, college_degree = 0))
+```
+
+### Calculating Standard Errors
+
+Under the assumption of homoskedasticity, the covariance matrix of the estimator is:
+
+$$
+\hat{\Sigma}_{\beta} = (\mathbf{X}^\top \mathbf{X})^{-1} \hat{\sigma}^2
+$$
+
+Where $\hat{\sigma}^2$ is the estimated variance of the residuals.
+
+```{r}
+# Estimate variance of residuals
+n <- nrow(cps)
+p <- ncol(X)
+s_squared <- sum(mod.1$residuals^2) / (n - p)
+
+# Covariance matrix
+Sigma_hat <- s_squared * solve(t(X) %*% X)
+Sigma_hat
+
+# Standard errors
+se_beta <- sqrt(diag(Sigma_hat))
+se_beta
+```
+
+We can compare this with the results from `lm()`:
+
+```{r}
+cbind(summary(mod.1)$coefficients, confint(mod.1))
+```
+
+## Inference of Predictions
+
+Now, in previous lab, we have discussed how to get the estimates of SEs and CIs of the coefficients with the bootstrap and plug-in methods. However, in real applications, in many scenarios we may be more interested in getting the confidence of a specific predict, for example to see if we should expect the outcome of a specific subpopulation to be different from zero. In those case, we can instead use a \`\`Confidence Interval of the prediction''.
+
+### Bootstrapping Predicted Wages
+
+Suppose we want to estimate the confidence interval for the predicted `wage` of a 30-year-old individual without a college degree. Note that we are estimating the CI of this expected value:
+
+$$
+\mathbb{E}[Wage|Age = 30, College = 0]
+$$ That is, the conditional mean wage of the subpopulation with `age = 30` and no college degree. We can first use the bootstrap:
+
+```{r}
+set.seed(42) # For reproducibility
+
+# # of bootstrap samples
+B <- 4000
+
+# Store predictions
+boot_preds <- numeric(B)
+
+for (b in 1:B) {
+  # Resample the data
+  boot_sample <- cps[sample(1:nrow(cps), replace = TRUE), ]
+  
+  boot_mod <- lm(wage ~ age + factor(college_degree), data = boot_sample)
+  
+  # Predict the wage for age = 30, college_degree = 0
+  boot_preds[b] <- predict(boot_mod,
+                           newdata = data.frame(age = 30,
+                                                college_degree = 0))
+}
+
+# Bootstrap CI
+boot_ci <- quantile(boot_preds, probs = c(0.025, 0.975))
+boot_ci
+```
+
+### Comparing with Plug-in Confidence Interval
+
+In R, we can also use `predict()` function to get estimates of the prediction confidence interval using plug-in method. For example, setting `se.fit = TRUE` would give us the Standard errors of the predictions, along with the predictions themselves.
+
+```{r}
+# Predict with standard errors
+pred <- predict(
+  mod.1,
+  newdata = data.frame(age = 30, college_degree = 0),
+  se.fit = TRUE
+)
+pred$se.fit
+```
+
+With the SEs in hand, we can estimate the CI using the plug-in formula as usual:
+
+```{r}
+# Plug-in confidence interval
+alpha <- 0.05
+t_value <- qt(1 - alpha / 2, df = mod.1$df.residual)
+analytical_ci <- pred$fit + c(-1, 1) * t_value * pred$se.fit
+analytical_ci
+```
+
+Here, we can see that they are largely similar.
+
+### Visualizing the Bootstrap Distribution
+
+Finally, we can visualize the bootstrap distribution of the prediction:
+
+```{r}
+hist(
+  boot_preds,
+  breaks = 30,
+  main = "Bootstrap Distribution of Predicted Wage",
+  xlab = "Predicted Wage",
+  border = "blue",
+  col = "lightblue"
+)
+abline(v = pred$fit, col = "red", lwd = 2)
+abline(v = boot_ci, col = "darkgreen", lwd = 2, lty = 2)
+legend(
+  "topright",
+  legend = c("Analytical Prediction", "Bootstrap 95% CI"),
+  col = c("red", "darkgreen"),
+  lwd = 2,
+  lty = c(1, 2)
+)
+```
+
+------------------------------------------------------------------------
+
+## Confidence Interval vs. Prediction Interval
+
+When making predictions using a regression model, it's important to quantify the uncertainty associated with these predictions. There are two types of intervals commonly used:
+
+1.  **Confidence Interval (CI) of the Prediction**: This interval estimates the range within which the **expected value** of the response variable lies, given specific predictor values. It reflects the uncertainty in estimating the mean response due to sampling variability.
+
+2.  **Prediction Interval (PI)**: This interval estimates the range within which an **individual** response will fall, given specific predictor values. It accounts for both the uncertainty in estimating the mean response and the variability of individual observations around that mean.
+
+Understanding the difference between these intervals is crucial:
+
+-   The **confidence interval** is narrower because it only accounts for the uncertainty in estimating the mean.
+-   The **prediction interval** is wider because it includes the additional variability of individual observations.
+
+### Example: Predicting Wage for a 30-Year-Old Individual Without a College Degree
+
+Let's use our basic model to predict the wage for a 30-year-old individual without a college degree and compute both intervals.
+
+### Making Predictions with Intervals
+
+We can use the `predict()` function to obtain both confidence and prediction intervals.
+
+#### Prediction Data
+
+```{r}
+# Create a data frame for the prediction
+new_data <- data.frame(
+  age = 30,
+  college_degree = 0
+)
+```
+
+#### Obtaining Confidence Interval
+
+```{r}
+# Predict the mean wage with confidence interval
+pred_ci <- predict(
+  mod.1,
+  newdata = new_data,
+  interval = "confidence",
+  level = 0.95
+)
+pred_ci
+```
+
+#### Obtaining Prediction Interval
+
+```{r}
+# Predict the wage for an individual with prediction interval
+pred_pi <- predict(
+  mod.1,
+  newdata = new_data,
+  interval = "prediction",
+  level = 0.95
+)
+pred_pi
+```
+
+### Results Interpretation
+
+-   **Confidence Interval (CI)**:
+    -   The point estimate (`fit`) is the predicted mean wage for all 30-year-old individuals without a college degree.
+    -   The `lwr` and `upr` values provide the lower and upper bounds of the 95% confidence interval for the **mean wage**. That is, as discussed above, the CI of $\mathbb{E}[Wage | Age, College]$.
+-   **Prediction Interval (PI)**:
+    -   The point estimate (`fit`) is the same as in the confidence interval.
+    -   The `lwr` and `upr` values provide the lower and upper bounds of the 95% prediction interval for the **wage of an individual** 30-year-old without a college degree. This includes the expected mean plus the noises: $\mathbb{E}[Wage | Age, College] + \varepsilon_i$.
+
+### Visualizing the Intervals
+
+To better understand the difference, let's visualize both intervals.
+
+#### Plotting the Confidence and Prediction Intervals
+
+We will plot the predicted wages over a range of ages for individuals without a college degree, including both intervals.
+
+```{r}
+# Create a sequence of ages
+age_seq <- seq(20, 80, by = 0.1)
+
+# Create prediction data
+pred_data <- data.frame(
+  age = age_seq,
+  college_degree = 0
+)
+
+# Get predictions with intervals
+predictions <- predict(
+  mod.1,
+  newdata = pred_data,
+  interval = "prediction",
+  level = 0.95
+)
+
+# Add predictions to pred_data
+pred_data$fit <- predictions[, "fit"]
+pred_data$ci_lwr <- predict(mod.1, newdata = pred_data, interval = "confidence")[, "lwr"]
+pred_data$ci_upr <- predict(mod.1, newdata = pred_data, interval = "confidence")[, "upr"]
+pred_data$pi_lwr <- predictions[, "lwr"]
+pred_data$pi_upr <- predictions[, "upr"]
+
+# Plot
+library(ggplot2)
+
+ggplot(pred_data, aes(x = age, y = fit)) +
+  geom_point(data = cps, aes(x = age, y = wage,
+                             color = factor(college_degree)),
+             alpha = 0.3) +
+  geom_line(color = "cyan4", size = 1) +
+  geom_ribbon(aes(ymin = ci_lwr, ymax = ci_upr), fill = "darkorange", alpha = 0.1) +
+  geom_ribbon(aes(ymin = pi_lwr, ymax = pi_upr), fill = "grey", alpha = 0.2) +
+  labs(
+    title = "Predicted Wage with Confidence and Prediction Intervals",
+    x = "Age",
+    y = "Predicted Wage"
+  ) +
+  theme_minimal()
+
+# basically, the prediction interval is larger than the CI
+```
+
+**Explanation**:
+
+-   **Blue Line**: The predicted mean wage (`fit`) across ages.
+-   **Blue Shaded Area**: The 95% **confidence interval** for the mean wage.
+-   **Grey Shaded Area**: The 95% **prediction interval** for individual wages.
+
+### Key Takeaways
+
+-   The **confidence interval** is narrower because it only accounts for the uncertainty in estimating the mean wage at each age.
+
+-   The **prediction interval** is wider because it includes both the uncertainty in estimating the mean and the variability of individual wages around that mean (i.e., the residual or error term).
+
+### Mathematical Formulas
+
+#### Confidence Interval
+
+The confidence interval for the mean prediction is given by:
+
+$$
+\hat{Y}_0 \pm t_{\alpha/2, n-p} \cdot \text{SE}(\hat{Y}_0)
+$$
+
+Where:
+
+-   $\hat{Y}_0$ is the predicted mean response.
+-   $t_{\alpha/2, n-p}$ is the critical value from the t-distribution with $n - p$ degrees of freedom.
+-   $\text{SE}(\hat{Y}_0)$ is the standard error of the predicted mean response.
+
+#### Prediction Interval
+
+The prediction interval for an individual prediction is given by:
+
+$$
+\hat{Y}_0 \pm t_{\alpha/2, n-p} \cdot \sqrt{\text{SE}(\hat{Y}_0)^2 + \hat{\sigma}^2}
+$$
+
+Where:
+
+-   $\hat{\sigma}^2$ is the estimated variance of the residuals (error term).
+
+### Calculations in R
+
+We can extract the standard error of the predicted mean and the residual standard error from `predict()` and the `lm()` model, and plug them into the formulae:
+
+```{r}
+# Standard error of the mean prediction
+se_mean_pred <- pred$se.fit
+
+# Residual standard error
+residual_se <- summary(mod.1)$sigma
+
+# Critical t-value
+alpha <- 0.05
+df <- mod.1$df.residual
+t_value <- qt(1 - alpha / 2, df)
+
+# Confidence interval calculation
+ci_lwr_calc <- pred$fit - t_value * se_mean_pred
+ci_upr_calc <- pred$fit + t_value * se_mean_pred
+print(c(ci_lwr_calc, ci_upr_calc))
+# Prediction interval calculation
+pi_lwr_calc <- pred$fit - t_value * sqrt(se_mean_pred^2 + residual_se^2)
+pi_upr_calc <- pred$fit + t_value * sqrt(se_mean_pred^2 + residual_se^2)
+print(c(pi_lwr_calc, pi_upr_calc))
+```
+
+### Practical Implications
+
+-   Use the **confidence interval** when you are interested in the average outcome for a group.
+
+-   Use the **prediction interval** when you want to predict the outcome for an individual case.
+
+### Example in Context
+
+Suppose a policymaker wants to estimate the average wage of 30-year-old individuals without a college degree to set wage policies. The **confidence interval** provides the range where the true mean wage likely falls.
+
+Alternatively, an employer wants to know the expected wage they might have to pay a newly hired 30-year-old without a college degree. The **prediction interval** gives the range of wages they might expect to pay, accounting for individual variability.
+
+------------------------------------------------------------------------
+
+## Varying Slopes and Intercepts Model (Interaction Effects)
+
+In multiple linear regression, interaction terms allow us to model situations where the effect of one predictor variable on the response variable depends on the level of another predictor. This is particularly useful when exploring complex relationships between variables.
+
+### Interaction Between Age and College Degree
+
+Previously, we considered the model:
+
+$$
+\text{Wage}_i = \beta_0 + \beta_1 \text{Age}_i + \beta_2 \text{CollegeDegree}_i + \varepsilon_i
+$$
+
+Now, we introduce an interaction term between `age` and `college_degree`:
+
+$$
+\text{Wage}_i = \beta_0 + \beta_1 \text{Age}_i + \beta_2 \text{CollegeDegree}_i + \beta_3 (\text{Age}_i \times \text{CollegeDegree}_i) + \varepsilon_i
+$$
+
+This model allows the effect of `age` on `wage` to differ depending on whether an individual has a college degree. This is the linear form of:
+
+$$
+\text{Wage}_i = m_0 (\text{CollegeDegree}_i) + m_1(\text{Age}_i | \text{CollegeDegree}_i) + \varepsilon_i
+$$
+
+#### Estimating the Interaction Model
+
+We estimate the model in R using the `lm()` function, incorporating the interaction term. There are two ways to include the interaction term:
+
+1.  Using the `*` operator, which includes both main effects and the interaction term:
+
+    ```{r}
+    mod_interaction <- lm(wage ~ age * college_degree, data = cps)
+    summary(mod_interaction)
+    ```
+
+2.  Explicitly specifying the interaction term:
+
+    ```{r}
+    mod_interaction <- lm(wage ~ age + college_degree + age:college_degree, data = cps)
+    summary(mod_interaction)
+    ```
+
+#### Interpreting the Coefficients
+
+In this interaction model:
+
+-   $\beta_0$: The expected `wage` when `age = 0` and `college_degree = 0`. While `age = 0` may not be meaningful in practice, $\beta_0$ serves as a baseline.
+
+-   $\beta_1$: The effect of `age` on `wage` for individuals **without** a college degree (`college_degree = 0`).
+
+-   $\beta_2$: The difference in the intercept between individuals with and without a college degree when `age = 0`.
+
+-   $\beta_3$: The difference in the effect of `age` on `wage` between individuals with and without a college degree. This means that $\beta_3$ represents how much the slope of `age` changes when moving from `college_degree = 0` to `college_degree = 1`.
+
+##### Mathematical Representation
+
+When `college_degree = 0`, the model simplifies to:
+
+$$
+\text{Wage}_i = \beta_0 + \beta_1 \text{Age}_i + \varepsilon_i
+$$
+
+When `college_degree = 1`, the model becomes:
+
+$$
+\text{Wage}_i = (\beta_0 + \beta_2) + (\beta_1 + \beta_3) \text{Age}_i + \varepsilon_i
+$$
+
+This shows that both the intercept and the slope with respect to `age` differ based on `college_degree`.
+
+##### Practical Interpretation
+
+-   **For individuals without a college degree (`college_degree = 0`)**:
+    -   **Intercept**: $\beta_0$
+    -   **Slope**: $\beta_1$ (effect of `age` on `wage`)
+-   **For individuals with a college degree (`college_degree = 1`)**:
+    -   **Intercept**: $\beta_0 + \beta_2$
+    -   **Slope**: $\beta_1 + \beta_3$ (effect of `age` on `wage`)
+
+Thus, $\beta_3$ indicates how the effect of `age` on `wage` changes for individuals with a college degree compared to those without.
+
+#### Comparing Models
+
+To see this in practice, let's compare the coefficients from the interaction model to those from separate models estimated for each sub-population, one for people with college degree, and one for people without.
+
+```{r}
+# Interaction model
+mod_interaction <- lm(wage ~ age * college_degree, data = cps)
+summary(mod_interaction)
+
+# Model for individuals with a college degree
+mod_college <- lm(wage ~ age, data = cps[cps$college_degree == 1, ])
+summary(mod_college)
+
+# Model for individuals without a college degree
+mod_no_college <- lm(wage ~ age, data = cps[cps$college_degree == 0, ])
+summary(mod_no_college)
+```
+
+Let's compare the coefficients:
+
+-   **Intercept for College Degree = 1**:
+
+    From interaction model:
+
+    ```{r}
+    intercept_college <- coef(mod_interaction)["(Intercept)"] + coef(mod_interaction)["college_degree"]
+    intercept_college
+    ```
+
+    From separate model:
+
+    ```{r}
+    coef(mod_college)["(Intercept)"]
+    ```
+
+-   **Slope for College Degree = 1**:
+
+    From interaction model:
+
+    ```{r}
+    slope_college <- coef(mod_interaction)["age"] + coef(mod_interaction)["age:college_degree"]
+    slope_college
+    ```
+
+    From separate model:
+
+    ```{r}
+    coef(mod_college)["age"]
+    ```
+
+The same applies for individuals without a college degree:
+
+-   **Intercept**:
+
+    ```{r}
+    coef(mod_interaction)["(Intercept)"]
+    coef(mod_no_college)["(Intercept)"]
+    ```
+
+-   **Slope**:
+
+    ```{r}
+    coef(mod_interaction)["age"]
+    coef(mod_no_college)["age"]
+    ```
+
+We can see that the coefficients from the interaction model correspond to those from the separate models.
+
+#### Visualizing the Interaction
+
+We can visualize the interaction by plotting the predicted `wage` against `age` for individuals with and without a college degree.
+
+```{r}
+library(ggplot2)
+
+
+# change 'college_degree' to a factor for visualize
+cps$college_degree <- factor(cps$college_degree, levels = c(0, 1), 
+                             labels = c("No College Degree", "College Degree"))
+
+# Estimate the interaction model if not already done
+mod_interaction <- lm(wage ~ age * college_degree, data = cps)
+
+# Create prediction data
+age_seq <- seq(min(cps$age), max(cps$age), length.out = 100)
+pred_data <- expand.grid(
+  age = age_seq,
+  college_degree = c(0, 1)
+)
+
+# Convert 'college_degree' to factor in 'pred_data' with the same levels and labels
+pred_data$college_degree <- factor(pred_data$college_degree, levels = c(0, 1), labels = c("No College Degree",
+                                                                                          "College Degree"))
+
+# Generate predictions
+pred_data$predicted_wage <- predict(mod_interaction, newdata = pred_data)
+
+# Plot
+ggplot() +
+  geom_point(data = cps, aes(x = age, y = wage, color = college_degree), alpha = 0.3) +
+  geom_line(data = pred_data, aes(x = age, y = predicted_wage, color = college_degree), size = 1) +
+  labs(
+    title = "Predicted Wage by Age and College Degree",
+    x = "Age",
+    y = "Wage",
+    color = "College Degree"
+  ) +
+  theme_minimal()
+```
+
+Here, we see that the two lines are not parallel, with different intercepts and different slopes.
+
+This plot shows that:
+
+-   The lines have **different intercepts**: Reflecting $\beta_2$.
+-   The lines have **different slopes**: Reflecting $\beta_3$.
+
+We observe that the effect of `age` on `wage` depends on `college_degree`.
+
+#### Interpretation of the Interaction Effect
+
+-   If $\beta_3$ is positive:
+    -   The increase in `wage` with `age` is greater for individuals with a college degree.
+-   If $\beta_3$ is negative:
+    -   The increase in `wage` with `age` is smaller for individuals with a college degree.
+
+In our model, we can examine the sign and significance of $\beta_3$ to interpret the interaction.
+
+### Two Categorical Variables
+
+#### Binary Variables
+
+Interaction between two categorical variables is common in experimental designs, for example when you have a 2 by 2 design. Consider the interaction between `college_degree` and `marital` status (married or not).
+
+```{r}
+mod_cat_cat <- lm(wage ~ college_degree * marital, data = cps)
+summary(mod_cat_cat)
+```
+
+The coefficients correspond to the expected `wage` in each combination of categories.
+
+The model can be represented in a table:
+
+|   | Marital = 0 | Marital = 1 |
+|----|----|----|
+| College Degree = 0 | $\beta_0$ | $\beta_0 + \beta_2$ |
+| College Degree = 1 | $\beta_0 + \beta_1$ | $\beta_0 + \beta_1 + \beta_2 + \beta_3$ |
+
+Where:
+
+-   $\beta_0$: Baseline intercept (College Degree = 0, Marital = 0).
+-   $\beta_1$: Effect of College Degree = 1 vs. 0 when Marital = 0.
+-   $\beta_2$: Effect of Marital = 1 vs. 0 when College Degree = 0.
+-   $\beta_3$: Interaction effect between `college_degree` and `marital`.
+
+To verify this, let's compute the mean `wage` for each group:
+
+```{r}
+# Compute subpopulation means from data
+cell_means <- aggregate(wage ~ college_degree + marital, data = cps, mean)
+
+# Extract coefficients
+coefficients <- coef(mod_cat_cat)
+
+# Calculate cell means using coefficients
+cell_mean_00 <- coefficients[1]
+cell_mean_10 <- coefficients[1] + coefficients[2]
+cell_mean_01 <- coefficients[1] + coefficients[3]
+cell_mean_11 <- coefficients[1] + coefficients[2] + coefficients[3] + coefficients[4]
+
+# Compare
+data.frame(
+  CollegeDegree = c("No College Degree", "College Degree", "No College Degree", "College Degree"),
+  Marital = c(0, 0, 1, 1),
+  CellMean_Calculated = c(cell_mean_00, cell_mean_10, cell_mean_01, cell_mean_11),
+  CellMean_Data = cell_means$wage
+)
+```
+
+This shows that the model accurately captures the mean `wage` in each category combination.
+
+#### Categorical Variables
+
+Let's revisit the general model of `wage`, `age`, and `college_degree` above:
+
+$$
+\text{Wage}_i = m_0 (\text{CollegeDegree}_i) + m_1(\text{Age}_i | \text{CollegeDegree}_i) + \varepsilon_i
+$$
+
+Here, what if we want $m_1()$ to have a more flexible form? We can, for example, coarsen `age` into groups:
+
+```{r}
+cps <- cps %>%
+    mutate(age_quantile = ntile(age, 10))
+```
+
+We can first fit a model with varying intercepts but unconditional $m_1()$:
+
+```{r}
+mod.coarsen1 <- lm(wage ~ college_degree + factor(age_quantile), data = cps)
+summary(mod.coarsen1)
+```
+
+We can plot this:
+
+```{r}
+
+# Create prediction data
+age_seq <- seq(1, 10, by = 1)
+
+pred_data <- expand.grid(
+  age_quantile = age_seq,
+  college_degree = c(0, 1)
+)
+
+# Convert 'college_degree' to factor in 'pred_data' with the same levels and labels
+pred_data$college_degree <- factor(pred_data$college_degree, levels = c(0, 1), labels = c("No College Degree", "College Degree"))
+# Generate predictions
+pred_data$predicted_wage <- predict(mod.coarsen1, newdata = pred_data)
+
+# Plot
+ggplot() +
+  geom_point(data = cps, aes(x = age_quantile, y = wage, color = college_degree), alpha = 0.3,
+             position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = age_quantile, y = predicted_wage, 
+                                  color = college_degree), size = 1) +
+  labs(
+    title = "Predicted Wage by Age and College Degree",
+    x = "Age",
+    y = "Wage",
+    color = "College Degree"
+  ) +
+  theme_minimal()
+```
+
+We can also allow a full interactive model:
+
+```{r}
+mod.coarsen2 <- lm(wage ~ college_degree*factor(age_quantile), data = cps)
+summary(mod.coarsen2)
+```
+
+Let's plot this:
+
+```{r}
+
+# Create prediction data
+age_seq <- seq(1, 10, by = 1)
+
+pred_data <- expand.grid(
+  age_quantile = age_seq,
+  college_degree = c(0, 1)
+)
+
+# Convert 'college_degree' to factor in 'pred_data' with the same levels and labels
+pred_data$college_degree <- factor(pred_data$college_degree, levels = c(0, 1), labels = c("No College Degree",
+                                                                                          "College Degree"))
+
+# Generate predictions
+pred_data$predicted_wage <- predict(mod.coarsen2, newdata = pred_data)
+
+# Plot
+ggplot() +
+  geom_point(data = cps, aes(x = age_quantile, y = wage, color = college_degree), alpha = 0.3,
+             position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = age_quantile, y = predicted_wage, 
+                                  color = college_degree), size = 1) +
+  labs(
+    title = "Predicted Wage by Age and College Degree",
+    x = "Age",
+    y = "Wage",
+    color = "College Degree"
+  ) +
+  theme_minimal()
+
+# the group with a college degree has a higher peak than the group w/o
+```
+
+Here, the two curves are no longer parallel, with the U-shaped effect of `age` on `wage` being clearer for people with college degree.
+
+### Two Continuous Variables
+
+When both interacting variables are continuous, the interpretation involves understanding how the effect of one variable changes across values of the other.
+
+#### Example: Age and Education
+
+Consider the interaction between `age` and `education`:
+
+$$
+\text{Wage}_i = \beta_0 + \beta_1 \text{Age}_i + \beta_2 \text{Education}_i + \beta_3 (\text{Age}_i \times \text{Education}_i) + \varepsilon_i
+$$
+
+##### Estimating the Model
+
+```{r}
+mod_cont_cont <- lm(wage ~ age * education, data = cps)
+summary(mod_cont_cont)
+```
+
+##### Interpreting the Coefficients
+
+-   The **marginal effect of `age` on `wage`** is:
+
+    $$
+    \frac{\partial \text{Wage}}{\partial \text{Age}} = \beta_1 + \beta_3 \text{Education}_i
+    $$
+
+-   The **marginal effect of `education` on `wage`** is:
+
+    $$
+    \frac{\partial \text{Wage}}{\partial \text{Education}} = \beta_2 + \beta_3 \text{Age}_i
+    $$
+
+This means that:
+
+-   The effect of `age` on `wage` depends on the level of `education`.
+-   The effect of `education` on `wage` depends on the age of the individual.
+
+##### Visualizing the Interaction
+
+In order to illustrate the above, we can, for example, visualize how the marginal effect of `age` on `wage` changes with `education`.
+
+```{r}
+# Create a sequence of education levels
+education_seq <- seq(min(cps$education), max(cps$education), length.out = 100)
+
+# Calculate marginal effect of age at different education levels
+marginal_effect_age <- coef(mod_cont_cont)["age"] + coef(mod_cont_cont)["age:education"] * education_seq
+
+# Plot
+plot(education_seq, marginal_effect_age, type = "l", col = "blue",
+     xlab = "Years of Education", ylab = "Marginal Effect of Age on Wage",
+     main = "Marginal Effect of Age on Wage by Education Level")
+abline(h = 0, lty = 2, col = "red")
+```
+
+##### Interpretation
+
+-   If $\beta_3$ is positive:
+    -   The effect of `age` on `wage` **increases** with higher levels of `education`.
+-   If $\beta_3$ is negative:
+    -   The effect of `age` on `wage` **decreases** with higher levels of `education`.
+
+In our model, we can observe whether the marginal effect of `age` becomes stronger or weaker as `education` increases, and for people with 3 years of education or less, the expected wage decreases as they get older.

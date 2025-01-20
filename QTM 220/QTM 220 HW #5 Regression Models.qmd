@@ -1,0 +1,444 @@
+---
+title: "QTM 220 HW #5"
+author: "Veronica Vargas"
+format: html
+editor: visual
+---
+
+# Exercise #3
+
+## Least Squares Regression Models: Sample
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+nba_2023 <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/nba.sample.data.csv")
+nba_2023
+```
+
+### (a) Sample Data Cleaning & Overview
+
+```{r}
+nba_2023 <- nba_2023 %>%
+  mutate(Position = case_when(
+    POS == 'C' ~ 'Center',
+    POS %in% c('SG','PG','G') ~ 'Guard',
+    POS %in% c('SF','PF','F') ~ 'Forward')) %>%
+  na.omit()
+```
+
+```{r}
+ggplot(nba_2023, aes(x = Age, y = PTS)) +
+  geom_point(aes(x = Age, y = PTS,
+                             color = factor(Position)),
+             alpha = 0.3) +
+  labs(
+    title = "Sample Points vs. Age",
+    x = "Age",
+    y = "Points",
+    color = "Position") +
+  theme_minimal()
+```
+
+### (b) Parallel Lines Model: Sample
+
+```{r}
+mod.coarsen1 <- lm(PTS ~ Position + Age, data = nba_2023)
+mod.coarsen1
+```
+
+```{r}
+age_seq <- seq(min(nba_2023$Age), max(nba_2023$Age), by = 1)
+
+pred_data <- expand.grid(
+  Age = age_seq,
+  Position = c(0, 1, 2))
+
+pred_data$Position <- factor(pred_data$Position,
+                             levels = c(0, 1, 2), 
+                             labels = c("Center", "Guard", "Forward"))
+
+pred_data$predicted_PTS <- predict(mod.coarsen1, newdata = pred_data)
+```
+
+```{r}
+ggplot() +
+  geom_point(data = nba_2023, aes(x = Age, y = PTS, color = Position),
+             alpha = 0.3, position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = Age, y = predicted_PTS, 
+                                  color = Position), size = 1) +
+  labs(
+    title = "Sample Parallel Lines Predictive Model",
+    x = "Age",
+    y = "Points",
+    color = "Position"
+  ) +
+  theme_minimal()
+```
+
+### (c) Parallel Line Bootstrap: Sample
+
+```{r}
+set.seed(42)
+
+B <- 10000
+
+boot_preds <- numeric(B)
+
+for (b in 1:B) {
+  boot_sample <- nba_2023[sample(1:nrow(nba_2023), replace = TRUE), ]
+  
+  boot_mod <- lm(PTS ~ Position + Age, data = boot_sample)
+  
+  boot_preds[b] <- predict(boot_mod,
+                           newdata = data.frame(Age = 20,
+                                                Position = "Center"))
+}
+
+lower.bound <- quantile(boot_preds, 0.025)
+upper.bound <- quantile(boot_preds, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (d) Non-Parallel Lines Model: Sample
+
+```{r}
+mod.coarsen2 <- lm(PTS ~ Age + Position + Age*Position, data = nba_2023)
+mod.coarsen2
+```
+
+```{r}
+age_seq <- seq(min(nba_2023$Age), max(nba_2023$Age), by = 1)
+
+pred_data <- expand.grid(
+  Age = age_seq,
+  Position = c(0, 1, 2))
+
+pred_data$Position <- factor(pred_data$Position,
+                             levels = c(0, 1, 2), 
+                             labels = c("Center", "Guard", "Forward"))
+
+pred_data$predicted_PTS <- predict(mod.coarsen2, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = nba_2023, aes(x = Age, y = PTS, color = Position),
+             alpha = 0.3, position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = Age, y = predicted_PTS, 
+                                  color = Position), size = 1) +
+  labs(
+    title = "Sample Non-Parallel Lines Predictive Model",
+    x = "Age",
+    y = "Points",
+    color = "Position"
+  ) +
+  theme_minimal()
+```
+
+### (e) Non-Parallel Lines Bootstrap: Sample
+
+```{r}
+set.seed(42)
+
+B <- 10000
+
+boot_preds <- numeric(B)
+
+for (b in 1:B) {
+  boot_sample <- nba_2023[sample(1:nrow(nba_2023), replace = TRUE), ]
+  
+  boot_mod <- lm(PTS ~ Age + Position + Age*Position, data = boot_sample)
+  
+  boot_preds[b] <- predict(boot_mod,
+                           newdata = data.frame(Age = 20,
+                                                Position = "Center"))
+}
+
+boot_ci <- quantile(boot_preds, probs = c(0.025, 0.975))
+boot_ci
+```
+
+### (f) Additive Model: Sample
+
+```{r}
+mod.coarsen3 <- lm(PTS ~ factor(Age) + factor(Position), data = nba_2023)
+mod.coarsen3
+```
+
+```{r}
+age_seq <- seq(min(nba_2023$Age), max(nba_2023$Age), by = 1)
+
+pred_data <- expand.grid(
+  Age = age_seq,
+  Position = c(0, 1, 2))
+
+pred_data$Position <- factor(pred_data$Position,
+                             levels = c(0, 1, 2), 
+                             labels = c("Center", "Guard", "Forward"))
+
+pred_data$predicted_PTS <- predict(mod.coarsen3, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = nba_2023, aes(x = Age, y = PTS, color = Position),
+             alpha = 0.3, position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = Age, y = predicted_PTS, 
+                                  color = Position), size = 1) +
+  labs(
+    title = "Sample Additive Predictive Model",
+    x = "Age",
+    y = "Points",
+    color = "Position"
+  ) +
+  theme_minimal()
+```
+
+### (g) Additive Bootstrap: Sample
+
+```{r}
+set.seed(42)
+
+B <- 10000
+
+boot_preds <- numeric(B)
+
+for (b in 1:B) {
+
+  boot_sample <- nba_2023[sample(1:nrow(nba_2023), replace = TRUE), ]
+  
+  if (any(boot_sample$Age == 20)) {
+    boot_mod <- lm(PTS ~ factor(Age) + factor(Position), data = boot_sample)
+    
+    boot_preds[b] <- predict(boot_mod,
+              newdata = data.frame(Age = 20, Position = "Center"))
+  } else {
+    boot_preds[b] <- NA
+  }
+}
+
+boot_ci <- quantile(boot_preds, probs = c(0.025, 0.975), na.rm = TRUE)
+boot_ci
+```
+
+## Exercise #4 - Least Squares Regression Models: Population
+
+```{r}
+nba_pop <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/nba.data.csv")
+nba_pop
+```
+
+### (a) Population Data Cleaning & Overview
+
+```{r}
+nba_pop <- nba_pop %>%
+  mutate(Position = case_when(
+    POS == 'C' ~ 'Center',
+    POS %in% c('SG','PG','G') ~ 'Guard',
+    POS %in% c('SF','PF','F') ~ 'Forward')) %>%
+  na.omit()
+
+ggplot(nba_pop, aes(x = Age, y = PTS)) +
+  geom_point(aes(x = Age, y = PTS,
+                             color = factor(Position)),
+             alpha = 0.3) +
+  labs(
+    title = "Population Points vs. Age",
+    x = "Age",
+    y = "Points",
+    color = "Position") +
+  theme_minimal()
+```
+
+### (b) Parallel Lines Model: Population
+
+```{r}
+mod.coarsen4 <- lm(PTS ~ Position + Age, data = nba_pop)
+mod.coarsen4
+```
+
+```{r}
+age_seq <- seq(min(nba_pop$Age), max(nba_pop$Age), by = 1)
+
+pred_data <- expand.grid(
+  Age = age_seq,
+  Position = c(0, 1, 2))
+
+pred_data$Position <- factor(pred_data$Position,
+                             levels = c(0, 1, 2), 
+                             labels = c("Center", "Guard", "Forward"))
+
+pred_data$predicted_PTS <- predict(mod.coarsen4, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = nba_pop, aes(x = Age, y = PTS, color = Position),
+             alpha = 0.3, position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = Age, y = predicted_PTS, 
+                                  color = Position), size = 1) +
+  labs(
+    title = "Population Parallel Lines Predictive Model",
+    x = "Age",
+    y = "Points",
+    color = "Position"
+  ) +
+  theme_minimal()
+```
+
+### Parallel Lines Bootstrap: Population
+
+```{r}
+set.seed(42)
+
+B <- 10000
+
+boot_preds <- numeric(B)
+
+for (b in 1:B) {
+  boot_sample <- nba_pop[sample(1:nrow(nba_pop), replace = TRUE), ]
+  
+  boot_mod <- lm(PTS ~ Position + Age, data = boot_sample)
+  
+  boot_preds[b] <- predict(boot_mod,
+                           newdata = data.frame(Age = 20,
+                                                Position = "Center"))
+}
+
+boot_ci <- quantile(boot_preds, probs = c(0.025, 0.975))
+boot_ci
+```
+
+### Sub-population Mean
+
+```{r}
+mean(nba_pop$PTS[nba_pop$Position == "Center" & nba_pop$Age == 20], na.rm = TRUE)
+```
+
+### (c) Non-Parallel Lines Model: Population
+
+```{r}
+mod.coarsen5 <- lm(PTS ~ Age + Position + Age*Position, data = nba_pop)
+mod.coarsen5
+```
+
+```{r}
+age_seq <- seq(min(nba_pop$Age), max(nba_pop$Age), by = 1)
+
+pred_data <- expand.grid(
+  Age = age_seq,
+  Position = c(0, 1, 2))
+
+pred_data$Position <- factor(pred_data$Position,
+                             levels = c(0, 1, 2), 
+                             labels = c("Center", "Guard", "Forward"))
+
+pred_data$predicted_PTS <- predict(mod.coarsen5, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = nba_pop, aes(x = Age, y = PTS, color = Position),
+             alpha = 0.3, position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = Age, y = predicted_PTS, 
+                                  color = Position), size = 1) +
+  labs(
+    title = "Population Non-Parallel Lines Predictive Model",
+    x = "Age",
+    y = "Points",
+    color = "Position"
+  ) +
+  theme_minimal()
+```
+
+### Non-Parallel Lines Bootstrap: Population
+
+```{r}
+set.seed(42)
+
+B <- 10000
+
+boot_preds <- numeric(B)
+
+for (b in 1:B) {
+  boot_sample <- nba_pop[sample(1:nrow(nba_pop), replace = TRUE), ]
+  
+  boot_mod <- lm(PTS ~ Age + Position + Age*Position, data = boot_sample)
+  
+  boot_preds[b] <- predict(boot_mod,
+                           newdata = data.frame(Age = 20,
+                                                Position = "Center"))
+}
+
+boot_ci <- quantile(boot_preds, probs = c(0.025, 0.975))
+boot_ci
+```
+
+### Sub-population Mean
+
+```{r}
+mean(nba_pop$PTS[nba_pop$Position == "Center" & nba_pop$Age == 20], na.rm = TRUE)
+```
+
+### (d) Additive Model: Population
+
+```{r}
+mod.coarsen6 <- lm(PTS ~ factor(Age) + factor(Position), data = nba_pop)
+mod.coarsen6
+```
+
+```{r}
+age_seq <- unique(nba_pop$Age)
+
+pred_data <- expand.grid(
+  Age = age_seq,
+  Position = c(0, 1, 2))
+
+pred_data$Position <- factor(pred_data$Position,
+                             levels = c(0, 1, 2), 
+                             labels = c("Center", "Guard", "Forward"))
+
+pred_data$predicted_PTS <- predict(mod.coarsen6, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = nba_pop, aes(x = Age, y = PTS, color = Position),
+             alpha = 0.3, position=position_dodge(width=0.5)) +
+  geom_line(data = pred_data, aes(x = Age, y = predicted_PTS, 
+                                  color = Position), size = 1) +
+  labs(
+    title = "Population Additive Predictive Model",
+    x = "Age",
+    y = "Points",
+    color = "Position"
+  ) +
+  theme_minimal()
+```
+
+### Additive Model Bootstrap: Population
+
+```{r}
+set.seed(42)
+
+B <- 10000
+
+boot_preds <- numeric(B)
+
+for (b in 1:B) {
+
+  boot_sample <- nba_pop[sample(1:nrow(nba_pop), replace = TRUE), ]
+  
+  if (any(boot_sample$Age == 20)) {
+    boot_mod <- lm(PTS ~ factor(Age) + factor(Position), data = boot_sample)
+    
+    boot_preds[b] <- predict(boot_mod,
+              newdata = data.frame(Age = 20, Position = "Center"))
+  } else {
+    boot_preds[b] <- NA
+  }
+}
+
+boot_ci <- quantile(boot_preds, probs = c(0.025, 0.975), na.rm = TRUE)
+boot_ci
+```
+
+### Sub-population Mean
+
+```{r}
+mean(nba_pop$PTS[nba_pop$Position == "Center" & nba_pop$Age == 20], na.rm = TRUE)
+```

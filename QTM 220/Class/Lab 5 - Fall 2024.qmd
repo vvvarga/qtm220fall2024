@@ -1,0 +1,536 @@
+---
+title: "Lab 5: Subsample Means"
+author: "F. Nguyen"
+date: " 27 September 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+```{r}
+library(tidyverse)
+airbnb <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/austin_airbnb_july24.csv")
+```
+
+# Comparison between subsample means
+
+## Bootstrap
+
+```{r}
+set.seed(42)
+
+oursample <- airbnb[sample(1:nrow(airbnb), 5000, replace = T),]
+```
+
+Now, assume we want to compare the average price of listings by superhosts and normal hosts. First, we can get the true difference from the population data:
+
+```{r}
+superhost <- airbnb[airbnb$host_is_superhost == "t",]
+normalhost <- airbnb[airbnb$host_is_superhost == "f",]
+mean(superhost$price)
+mean(normalhost$price)
+mean(superhost$price) - mean(normalhost$price)
+```
+
+So from our population data, it turns out that superhosts charge on average \$86.2 less than normal hosts. What if we try to get this from our sample?
+
+```{r}
+superhost.sample <- oursample[oursample$host_is_superhost == "t",]
+normalhost.sample <- oursample[oursample$host_is_superhost == "f",]
+mean(superhost.sample$price)
+mean(normalhost.sample$price)
+mean(superhost.sample$price) - mean(normalhost.sample$price)
+```
+
+From the sample, the difference is \$117.3. We can construct the bootstrapped CI:
+
+```{r}
+set.seed(42)
+
+#Save the difference
+n <- 10000
+diff.boot <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_boot<-  oursample[sample(1:nrow(oursample), 
+                                  nrow(oursample), replace = T),]
+  
+  superhost.boot <- sample_boot[sample_boot$host_is_superhost == "t",]
+  normalhost.boot  <- sample_boot[sample_boot$host_is_superhost == "f",]
+  
+  diff.boot[i] <- mean(superhost.boot$price) - mean(normalhost.boot$price)
+}
+```
+
+The bootstrap CI of the difference is:
+
+```{r}
+quantile(diff.boot, c(0.025, 0.975))
+abs(quantile(diff.boot, 0.975) - quantile(diff.boot, 0.025))
+```
+
+We can plot this:
+
+```{r}
+ggplot(data = data.frame(diff = diff.boot), aes(x = diff)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(superhost$price) - mean(normalhost$price), linetype="dashed", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(superhost.sample$price) - mean(normalhost.sample$price), linetype="dotted",
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(diff.boot, 0.025), 
+                   xmax = quantile(diff.boot, 0.975), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+Now, since we have the full population data, we can also simulate the distribution of the estimated difference:
+
+```{r}
+set.seed(42)
+
+#Save the difference
+n <- 10000
+diff.sim <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_sim<-  airbnb[sample(1:nrow(airbnb), 5000, replace = T),]
+  superhost.sim <- sample_sim[sample_sim$host_is_superhost == "t",]
+  normalhost.sim  <- sample_sim[sample_sim$host_is_superhost == "f",]
+  diff.sim[i] <- mean(superhost.sim$price) - mean(normalhost.sim$price)
+}
+```
+
+Let's check the variance of this difference:
+
+```{r}
+var(diff.sim)
+mean(diff.sim)
+```
+
+We can see that this is similar to the analytical formula you derived in class:
+
+$$
+Var(\widehat{\mu}_1 - \widehat{\mu}_0) = \frac{\sigma_1^2}{\mathbb{E}[N_1]} + \frac{\sigma_2^2}{\mathbb{E}[N_2]} 
+$$
+
+We translate this to R as:
+
+```{r}
+p <- nrow(superhost)/nrow(airbnb)
+var(superhost$price)/(5000*p) + 
+  var(normalhost$price)/(5000*(1-p))
+```
+
+Additionally, the 95% range has the width very similar to our bootstrap CI:
+
+```{r}
+quantile(diff.sim, c(0.025, 0.975))
+abs(quantile(diff.sim, 0.975) - quantile(diff.sim, 0.025))
+```
+
+## Plug-in
+
+Instead of the computation heavy bootstrap operation, we can also directly employ the variance formula above to have a plug in estimator of the variance of the difference, using sample data:
+
+$$
+SE(\bar{X}_1 - \bar{X}_0)^2 = \frac{s_1^2}{n_1} + \frac{s_2^2}{n_2} 
+$$
+
+Then, thanks to Central Limit Theory, we can construct the CI using this plug in estimated variance:
+
+$$
+\bar{X}_1 - \bar{X}_0 \pm Q(1- \frac{\alpha}{2}) \times SE(\bar{X}_1 - \bar{X}_0)
+$$
+
+Here, we can do this by:
+
+```{r}
+var_diff <- var(superhost.sample$price)/nrow(superhost.sample) + 
+  var(normalhost.sample$price)/nrow(normalhost.sample)
+se_diff <- sqrt(var_diff)
+
+sample_diff <- mean(superhost.sample$price) - mean(normalhost.sample$price)
+q <- qnorm(1 - 0.05/2)
+
+lower.bound <- sample_diff - q*se_diff
+upper.bound <- sample_diff + q*se_diff
+
+print(paste0("The Plug-in 95% CI is {", lower.bound,", ",upper.bound,"}"))
+upper.bound - lower.bound
+```
+
+We can see that this is very similar to the bootstrap CI, and with the width very close to the simulated sampling distribution 95% width:
+
+```{r}
+quantile(diff.boot, c(0.025, 0.975))
+abs(quantile(diff.boot, 0.975) - quantile(diff.boot, 0.025))
+```
+
+The plug in estimator is also the equivalent of a common hypothesis testing procedure in classical statistics called a "Two-Sample T-Test", which can be performed by `t.test()` function:
+
+```{r}
+t.test(superhost.sample$price, normalhost.sample$price)
+```
+
+# Linear Combinations of Subsample means
+
+The previous mean difference comparison belongs to a family of operations called linear combinations of the means. In the previous example, we had a neat binary variable that we can split the sample on, however subsampling can also be applied to ordinal or continuous variables. To demonstrate this, assume we want to see how the prices of the airbnb listings differ by the number of bedrooms. We can plot the distribution of bedrooms. as:
+
+```{r}
+ggplot(data =airbnb, aes(x = bedrooms)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity", binwidth = 1) +
+  theme_minimal() 
+```
+
+Now, let's see how the prices differ by the number of bedrooms:
+
+```{r}
+airbnb %>%
+  group_by(bedrooms) %>%
+  summarize(avg_price = mean(price)) %>%
+  ggplot() +
+  # Original scatterplot from the raw data
+  geom_point(data = airbnb, 
+             aes(x = bedrooms, y = price), 
+             alpha = 0.5, color = "blue", 
+             position = position_dodge(width = 0.5
+                                       )) +  # Scatterplot
+  geom_point(aes(x = bedrooms, y = avg_price), color = "red", size = 3) +  # Points for average price
+  geom_line( aes(x = bedrooms, y = avg_price), 
+            color = "red", linetype = "dashed") +  # Line for average price
+  labs(title = "Price vs. Number of Bedrooms",
+       x = "Number of Bedrooms",
+       y = "Price") +
+  theme_minimal()
+```
+
+Now, since the listings with more than 10 bedrooms seem to be mostly outliers, let's ignore them:
+
+```{r}
+airbnb <- airbnb[airbnb$bedrooms <= 10,]
+
+airbnb %>%
+  group_by(bedrooms) %>%
+  summarize(avg_price = mean(price)) %>%
+  ggplot() +
+  # Original scatterplot from the raw data
+  geom_point(data = airbnb, 
+             aes(x = bedrooms, y = price), 
+             alpha = 0.5, color = "blue", 
+             position = position_dodge(width = 0.5
+                                       )) +  # Scatterplot
+  geom_point(aes(x = bedrooms, y = avg_price), color = "red", size = 3) +  # Points for average price
+  geom_line( aes(x = bedrooms, y = avg_price), 
+            color = "red", linetype = "dashed") +  # Line for average price
+  labs(title = "Price vs. Number of Bedrooms",
+       x = "Number of Bedrooms",
+       y = "Price") +
+  theme_minimal()
+```
+
+Now, we can see that there seems to be a significant difference in prices of the listings with less than five bedrooms, and ones with five and more. To check this:
+
+```{r}
+airbnb %>%
+  # Create a new categorical column for <= 4 and > 4
+  mutate(bedroom_category = ifelse(bedrooms <= 4, "4 and below", "More than 4")) %>%
+  # Group by and calculate average prices
+  group_by(bedroom_category) %>%
+  summarize(avg_price = mean(price)) 
+```
+
+Now, let's see what happens when we have only a sample of 2,000 listings:
+
+```{r}
+set.seed(42)
+
+oursample <- airbnb[sample(1:nrow(airbnb), 2000, replace = T),]
+```
+
+The sample difference is:
+
+```{r}
+oursample %>%
+  # Create a new categorical column for <= 4 and > 4
+  mutate(bedroom_category = ifelse(bedrooms <= 4, "4 and below", "More than 4")) %>%
+  # Group by and calculate average prices
+  group_by(bedroom_category) %>%
+  summarize(avg_price = mean(price)) 
+```
+
+Using the plug-in estimator approach above, we get the CI:
+
+```{r}
+lessthanfive <- oursample[oursample$bedrooms < 5,]$price
+fiveormore <- oursample[oursample$bedrooms >= 5,]$price
+
+var_diff <- var(lessthanfive)/length(lessthanfive) + 
+  var(fiveormore)/length(fiveormore)
+se_diff <- sqrt(var_diff)
+
+sample_diff <- mean(fiveormore) - mean(lessthanfive)
+q <- qnorm(1 - 0.05/2)
+
+lower.bound <- sample_diff - q*se_diff
+upper.bound <- sample_diff + q*se_diff
+
+print(paste0("The Plug-in 95% CI is {", lower.bound,", ",upper.bound,"}"))
+upper.bound - lower.bound
+```
+
+Since the CI doesn't contain 0, we can say that there is a significant difference in average prices between the listings with less than five bedrooms and ones with five and more, as confirmed in the population data.
+
+Now, what if we want to see the differences in average prices between each pairwise increments in the number of bedrooms?
+
+```{r}
+airbnb %>%
+  group_by(bedrooms) %>%
+  summarize(avg_price = mean(price)) %>% # Arrange by # of bedrooms 
+  arrange(bedrooms) %>%
+  mutate(price_diff = avg_price - lag(avg_price)) %>% # Calculate the difference in average price
+  knitr::kable()
+```
+
+Here we can see that, in accordance with the prior plot, most increments lead to an increase in average price. Is it the same case for our sample?
+
+```{r}
+oursample %>%
+  group_by(bedrooms) %>%
+  summarize(avg_price = mean(price)) %>% # Arrange by # of bedrooms 
+  arrange(bedrooms) %>%
+  mutate(price_diff = avg_price - lag(avg_price)) %>% # Calculate the difference in average price
+  knitr::kable()
+```
+
+Here we can see that the differences in the sample are not exactly similar. Assume we only have access to this sample, which of the differences can we confidently say are different from zero? We can test this by constructing the confidence intervals for them using the plug-in estimator:
+
+```{r}
+q <- qnorm(1 - 0.05/2)
+
+oursample %>%
+  group_by(bedrooms) %>%
+  summarize(
+    avg_price = mean(price),           # Calculate average price
+    n = n(),                           # Subsample size
+    se = sd(price) / sqrt(n)          # SE of the means
+  ) %>%
+  arrange(bedrooms) %>%
+  mutate(
+    price_diff = avg_price - lag(avg_price),              # Difference in average price
+    ci.95.lb = price_diff - q*sqrt((lag(se)^2 + se^2)),  # Lower bound of CI for the difference
+    ci.95.ub = price_diff + q*sqrt((lag(se)^2 + se^2))   # Upper bound of CI for the difference
+  ) %>%
+  knitr::kable()
+```
+
+From the confidence intervals, there are only a few incremental differences we can confidently say are different from zero. Note that this does not necessarily mean that the difference between, for example, 4 and 6 bedrooms are not significant:
+
+```{r}
+subsample.4 <- oursample[oursample$bedrooms == 4,]$price
+subsample.6 <- oursample[oursample$bedrooms == 6,]$price
+t.test(subsample.6, subsample.4)
+```
+
+Next, we can also look at the linear combinations of these differences. For example, let's say we want to know if the difference in average prices between 2 and 3 bedrooms is different from the difference in average prices between 3 and 4 bedrooms:
+
+$$
+\theta = \left(\mu_4 - \mu_3 \right) - \left(\mu_3 - \mu_2\right) = \mu_4 + \mu_2 - 2\mu_3
+$$
+
+Using the sum of variances property, we have:
+
+$$
+Var(\theta) = \frac{\sigma_4^2}{\mathbb{E}[N_4]} + \frac{\sigma_2^2}{\mathbb{E}[N_2]} + 4 \frac{\sigma_3^3}{\mathbb{E}[N_3]} 
+$$
+
+Thus, we can construct the plug-in estimator:
+
+```{r}
+subsample.2 <- oursample[oursample$bedrooms == 2,]$price
+subsample.3 <- oursample[oursample$bedrooms == 3,]$price
+subsample.4 <- oursample[oursample$bedrooms == 4,]$price
+
+
+var_diff <- var(subsample.4)/length(subsample.4) +
+  var(subsample.2)/length(subsample.2) +
+  4*var(subsample.3)/length(subsample.3)
+
+se_diff <- sqrt(var_diff)
+
+sample_diff <- mean(subsample.4) + mean(subsample.2) -2*mean(subsample.3)
+q <- qnorm(1 - 0.05/2)
+
+lower.bound <- sample_diff - q*se_diff
+upper.bound <- sample_diff + q*se_diff
+
+print(paste0("The Plug-in 95% CI is {", lower.bound,", ",upper.bound,"}"))
+upper.bound - lower.bound
+```
+
+Or we can use the bootstrap:
+
+```{r}
+set.seed(42)
+
+#Save the difference
+n <- 10000
+diff.boot <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_boot<-  oursample[sample(1:nrow(oursample), 
+                                  nrow(oursample), replace = T),]
+  subsample.2.boot <- sample_boot[sample_boot$bedrooms == 2,]$price
+  subsample.3.boot <- sample_boot[sample_boot$bedrooms == 3,]$price
+  subsample.4.boot <- sample_boot[sample_boot$bedrooms == 4,]$price
+
+  diff.boot[i] <- mean(subsample.4.boot) + mean(subsample.2.boot) - 2*mean(subsample.3.boot)
+}
+```
+
+The bootstrap CI of $\theta$ is:
+
+```{r}
+quantile(diff.boot, c(0.025, 0.975))
+abs(quantile(diff.boot, 0.975) - quantile(diff.boot, 0.025))
+```
+
+# Aggregation of Subsample Differences
+
+We can use the same approach to construct aggregations of the subsample differences. For example, if we want to get the average of the differences between the increments from 0 to 5, aggregated at bedroom level, i.e. all increments have equal weights. First, we check with the population data:
+
+```{r}
+pop.avg <- airbnb %>%
+  filter(bedrooms <= 5) %>%
+  group_by(bedrooms) %>%
+  summarize(avg_price = mean(price)) %>% # Arrange by # of bedrooms 
+  arrange(bedrooms) %>%
+  mutate(price_diff = avg_price - lag(avg_price)) %>% # Calculate the difference in average price
+  drop_na()
+mean(pop.avg$price_diff)
+```
+
+With the sample only:
+
+```{r}
+sample.avg <- oursample %>%
+  filter(bedrooms <= 5) %>%
+  group_by(bedrooms) %>%
+  summarize(avg_price = mean(price)) %>% # Arrange by # of bedrooms 
+  arrange(bedrooms) %>%
+  mutate(price_diff = avg_price - lag(avg_price)) %>% # Calculate the difference in average price
+  drop_na()
+mean(sample.avg$price_diff)
+```
+
+The result is a little bit different here. So, how do we construct the confidence interval from this? The estimand can be written as:
+
+$$
+\theta = \frac{1}{5}\sum_{x = 1}^{5} \left(\mu_{x} - \mu_{x - 1}\right) = \frac{1}{5}\left(\mu_5 - \mu_0 \right)= \sum_{x = 0}^{5}{\alpha_x}\mu_{x}
+$$
+
+Where $\alpha_x = -\frac{1}{5}$ for $x = 0$, $\alpha_x = \frac{1}{5}$ for $x = 5$, and $\alpha_x = 0$ otherwise. The plug in estimator is:
+
+$$
+\widehat{\theta} =  \sum_{x = 0}^{5}{\alpha_x}\bar{Y}_{x}
+$$
+
+With $\bar{Y}_x$ bein the subsample mean corresponding to $x$ bedrooms. Since $\alpha_x$ are constants, assuming the subsamples are iid, the variance can be derived simply as:
+
+$$
+Var(\widehat{\theta}) = Var\left( \sum_{x = 0}^{5}{\alpha_x}\bar{Y}_{x}\right) = Var\left(\frac{1}{5}\left[\bar{Y}_{5} - \bar{Y}_{0}\right]\right) = \frac{1}{25} \left( \frac{\sigma_5^2}{\mathbb{E}[N_5]}  + \frac{\sigma_0^2}{\mathbb{E}[N_0]} \right)
+$$
+
+Similar to above, the plug in for this is:
+
+$$ 
+SE(\widehat{\theta})^2 = \frac{1}{25} \left( \frac{s_5^2}{n_5}  + \frac{s_0^2}{n_0} \right)
+$$
+
+Thus, we can get the plug-in CI:
+
+```{r}
+subsample.0 <- oursample[oursample$bedrooms == 0,]$price
+subsample.5 <- oursample[oursample$bedrooms == 5,]$price
+
+
+var_diff <- (1/25)*(var(subsample.5)/length(subsample.5) +
+  var(subsample.0)/length(subsample.0))
+
+se_diff <- sqrt(var_diff)
+
+sample_diff <- (1/5)*(mean(subsample.5) - mean(subsample.0))
+q <- qnorm(1 - 0.05/2)
+
+lower.bound <- sample_diff - q*se_diff
+upper.bound <- sample_diff + q*se_diff
+
+print(paste0('The Plug-in 95% CI is {', lower.bound,',',upper.bound,'}'))
+upper.bound - lower.bound
+```
+
+Similar to above, we can compare this to the bootstrapped CI:
+
+```{r}
+set.seed(42)
+
+#Save the difference
+n <- 10000
+diff.boot <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_boot<-  oursample[sample(1:nrow(oursample), 
+                                  nrow(oursample), replace = T),]
+  subsample.0.boot <- sample_boot[sample_boot$bedrooms == 0,]$price
+  subsample.5.boot <- sample_boot[sample_boot$bedrooms == 5,]$price
+
+  diff.boot[i] <- (1/5)*(mean(subsample.5.boot) - mean(subsample.0.boot))
+}
+quantile(diff.boot, c(0.025, 0.975))
+abs(quantile(diff.boot, 0.975) - quantile(diff.boot, 0.025))
+```
+
+Of course, since we have access to the full population data, we can also simulate the full sampling distribution and compare it with the sample based inference:
+
+```{r}
+set.seed(42)
+
+#Save the difference
+n <- 10000
+diff.sim <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_sim<-  airbnb[sample(1:nrow(airbnb), 2000, replace = T),]
+  subsample.0.sim <- sample_sim[sample_sim$bedrooms == 0,]$price
+  subsample.5.sim <- sample_sim[sample_sim$bedrooms == 5,]$price
+
+  diff.sim[i] <- (1/5)*(mean(subsample.5.sim, na.rm = T) - mean(subsample.0.sim, na.rm = T))
+}
+quantile(diff.sim, c(0.025, 0.975))
+abs(quantile(diff.sim, 0.975) - quantile(diff.sim, 0.025))
+```
+
+Here we can see that the estimated CIs from the sample are slightly imprecise and wider than the actual middle 95% of the data. This is for the same reason as discussed in class, since only the subsamples of 0 and 5 bedrooms, which are much smaller in size in comparison to other subsamples (i.e, 1 - 4 bedrooms), are given non-zero weights. We can plot this as follow:
+
+```{r}
+ggplot(data = data.frame(diff.sim = diff.sim), aes(x = diff.sim)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(pop.avg$price_diff), linetype="dashed", 
+                color = "coral", linewidth=1) +
+geom_vline(xintercept = quantile(diff.boot, 0.025), linetype="dashed", # bootstrap CI
+                color = "darkorchid", linewidth=1) +
+  geom_vline(xintercept = quantile(diff.boot, 0.975), linetype="dashed",
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(diff.sim, 0.025), 
+                   xmax = quantile( diff.sim, 0.975), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```

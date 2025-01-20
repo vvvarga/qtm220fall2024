@@ -1,0 +1,318 @@
+---
+title: "QTM 220 HW #4"
+author: "Veronica Vargas"
+format: html
+editor: visual
+---
+
+# Exercise #1
+
+## Fire VS Water
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+fireVSwater_pokemon <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/fireVSwater_pokemon.csv")
+
+head(fireVSwater_pokemon)
+summary(fireVSwater_pokemon)
+```
+
+### (a) Showing Balanced Groups
+
+```{r}
+fireVSwater_pokemon %>%
+  group_by(generation, type) %>%
+  summarise(
+    count = n(),
+    weight = mean(weight_kg, na.rm = T)) %>%
+  ungroup()
+```
+
+### (b) Summary Statistics w/ Plotting Evolution
+
+```{r}
+pokemon_summary <- fireVSwater_pokemon %>%
+  group_by(generation, type) %>%
+  summarise(
+    count = n(),
+    mean_weight = mean(weight_kg, na.rm = T),
+    sd_weight = sd(weight_kg, na.rm = T)) %>%
+  ungroup()
+
+pokemon_summary
+```
+
+```{r}
+ggplot(pokemon_summary, aes(x = generation, y = mean_weight,
+                                fill = as.factor(type))) +
+  geom_bar(stat = "identity", position = "identity", alpha = 0.5) +
+  labs(title = "Weight of Fire vs. Water Pokemon Across Generation",
+       x = "Generation",
+       y = "Weight") +
+  theme_minimal()
+```
+
+Here we see that, on average, weight decreases for both water and fire pokemon across generations. That said, there are consistent spikes in weight between generations.
+
+### (c) Difference in Mean Weight
+
+```{r}
+fire <- fireVSwater_pokemon[fireVSwater_pokemon$type == "fire",]
+water <- fireVSwater_pokemon[fireVSwater_pokemon$type == "water",]
+
+mean(fire$weight_kg) 
+mean(water$weight_kg)
+
+mean(fire$weight_kg) - mean(water$weight_kg)
+```
+
+This estimator is looking at the difference in mean weight between fire and water pokemon across all generations.
+
+### (d) Difference in Mean Weight Across Generations
+
+```{r}
+fire <- fireVSwater_pokemon[fireVSwater_pokemon$type == "fire",]
+water <- fireVSwater_pokemon[fireVSwater_pokemon$type == "water",]
+
+water <- water %>%
+  group_by(generation) %>%
+  summarise(avg_weight_water = mean(weight_kg, na.rm = TRUE), n_water = n()) %>%
+  ungroup()
+  
+fire <- fire %>%
+  group_by(generation) %>%
+  summarise(avg_weight_fire = mean(weight_kg, na.rm = TRUE), n_fire = n()) %>%
+  ungroup()
+  
+df <- full_join(water, fire, by = "generation") %>%
+  mutate(mean_diff = avg_weight_fire - avg_weight_water)
+
+mean(df$mean_diff)
+```
+
+This estimator is looking at the average difference in mean weight between fire and water pokemon for each generation.
+
+### (e) Difference in Mean Weight Across Generations w/ Fire Pokemon Focus
+
+```{r}
+fire <- fireVSwater_pokemon[fireVSwater_pokemon$type == "fire",]
+water <- fireVSwater_pokemon[fireVSwater_pokemon$type == "water",]
+
+water <- water %>%
+  group_by(generation) %>%
+  summarise(avg_weight_water = mean(weight_kg, na.rm = TRUE), n_water = n()) %>%
+  ungroup()
+  
+fire <- fire %>%
+  group_by(generation) %>%
+  summarise(avg_weight_fire = mean(weight_kg, na.rm = TRUE), n_fire = n()) %>%
+  ungroup()
+  
+df <- full_join(water, fire, by = "generation")
+
+(1/39) * sum(df$n_fire * (df$avg_weight_fire - df$avg_weight_water))
+```
+
+This estimator is looking at the weighted difference in means between fire and water pokemon for each generation with a focus on fire pokemon.
+
+### (f) Comparing Estimators
+
+None of these estimates are the same. This is because the groups are not balanced and by choosing to weight certain subgroups, our estimates will essentially be different.
+
+### (g) Bootstrapping Estimator
+
+```{r}
+set.seed(42)
+
+n <- 10000
+diff_boot <- rep(NA, n)
+
+for(i in 1:n){
+  
+  sample_boot <- fireVSwater_pokemon[sample(1:nrow(fireVSwater_pokemon), nrow(fireVSwater_pokemon), replace = TRUE),]
+  fire_boot <- sample_boot[sample_boot$type == "fire",]
+  water_boot <- sample_boot[sample_boot$type == "water",]
+
+  water_boot <- water_boot %>%
+    group_by(generation) %>%
+    summarise(avg_weight_water = mean(weight_kg, na.rm = TRUE), n_water = n()) %>%
+    ungroup()
+  
+  fire_boot <- fire_boot %>%
+    group_by(generation) %>%
+    summarise(avg_weight_fire = mean(weight_kg, na.rm = TRUE), n_fire = n()) %>%
+    ungroup()
+  
+  df <- full_join(water_boot, fire_boot, by = "generation")
+
+  diff_boot[i] <- (1/39) * sum(df$n_fire * (df$avg_weight_fire - df$avg_weight_water), na.rm = TRUE)
+}
+```
+
+```{r}
+lower.bound <- quantile(diff_boot, 0.025)
+upper.bound <- quantile(diff_boot, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+# Exercise #4
+
+## Voter Turnout Experiment Analysis
+
+```{r}
+GGLsample <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/GGLsample.csv")
+
+head(GGLsample)
+summary(GGLsample)
+```
+
+```{r}
+GGLsample <- GGLsample %>%
+  mutate(binvote = case_when(
+    voted == "Yes" ~ 1,
+    voted == "No" ~ 0))
+```
+
+### (a) CATE(male)
+
+```{r}
+df <- GGLsample %>%
+  group_by(sex) %>%
+  summarise(
+    N_Treated = sum(bintreat == 1),
+    N_Control = sum(bintreat == 0),
+    Mean_Treated = mean(binvote[bintreat == 1]),
+    Mean_Control = mean(binvote[bintreat == 0]),
+    CATE = Mean_Treated - Mean_Control
+  ) %>%
+  ungroup()
+
+df$CATE[df$sex == "male"]
+```
+
+This estimator is not causally identified because the treatment is not randomly conditioning on the sex.
+
+### (b) Bootstrapped CATE(male)
+
+```{r}
+set.seed(42)
+
+n <- 10000
+diff_boot <- rep(NA, n)
+
+for(i in 1:n){
+  sample_boot <-  GGLsample[sample(1:nrow(GGLsample), nrow(GGLsample), replace = T),]
+  
+  df <- sample_boot %>%
+  group_by(sex) %>%
+  summarise(
+    N_Treated = sum(bintreat == 1),
+    N_Control = sum(bintreat == 0),
+    Mean_Treated = mean(binvote[bintreat == 1]),
+    Mean_Control = mean(binvote[bintreat == 0]),
+    CATE = Mean_Treated - Mean_Control
+  ) %>%
+  ungroup()
+
+  diff_boot[i] <- df$CATE[df$sex == "male"]
+}
+```
+
+```{r}
+lower.bound <- quantile(diff_boot, 0.025)
+upper.bound <- quantile(diff_boot, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (c) CATE(female)
+
+```{r}
+df <- GGLsample %>%
+  group_by(sex) %>%
+  summarise(
+    N_Treated = sum(bintreat == 1),
+    N_Control = sum(bintreat == 0),
+    Mean_Treated = mean(binvote[bintreat == 1]),
+    Mean_Control = mean(binvote[bintreat == 0]),
+    CATE = Mean_Treated - Mean_Control
+  ) %>%
+  ungroup()
+
+df$CATE[df$sex == "female"]
+```
+
+This estimator is not casually identified because the treatment is not conditioned on sex.
+
+### (d) Bootstrapped CATE(female)
+
+```{r}
+set.seed(42)
+
+n <- 10000
+diff_boot <- rep(NA, n)
+
+for(i in 1:n){
+  sample_boot <-  GGLsample[sample(1:nrow(GGLsample), nrow(GGLsample), replace = T),]
+  
+  df <- sample_boot %>%
+  group_by(sex) %>%
+  summarise(
+    N_Treated = sum(bintreat == 1),
+    N_Control = sum(bintreat == 0),
+    Mean_Treated = mean(binvote[bintreat == 1]),
+    Mean_Control = mean(binvote[bintreat == 0]),
+    CATE = Mean_Treated - Mean_Control
+  ) %>%
+  ungroup()
+
+  diff_boot[i] <- df$CATE[df$sex == "female"]
+}
+```
+
+```{r}
+lower.bound <- quantile(diff_boot, 0.025)
+upper.bound <- quantile(diff_boot, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (e) Average Treatment Effect (ATE)
+
+```{r}
+treated <- mean(GGLsample$binvote[GGLsample$bintreat == 1]) 
+control <- mean(GGLsample$binvote[GGLsample$bintreat == 0])
+
+treated - control
+```
+
+### (f) Bootstrapped ATE
+
+```{r}
+set.seed(42)
+
+n <- 10000
+diff_boot <- rep(NA, n)
+
+for(i in 1:n){
+  sample_boot <- GGLsample[sample(1:nrow(GGLsample), nrow(GGLsample), replace = T),]
+  
+  treated <- mean(sample_boot$binvote[sample_boot$bintreat == 1], na.rm = TRUE) 
+  control <- mean(sample_boot$binvote[sample_boot$bintreat == 0], na.rm = TRUE)
+
+  diff_boot[i] <- treated - control
+}
+```
+
+```{r}
+lower.bound <- quantile(diff_boot, 0.025)
+upper.bound <- quantile(diff_boot, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+If we were to repeat this experiment under the same conditions with a sufficiently large sample size, the average treatment effect would fall somewhere within the interval for about 95 out of 100 trials. In this case, we estimate our average treatment effect to fall somewhere in between 0.043 and 0.114.

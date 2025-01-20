@@ -1,0 +1,402 @@
+---
+title: "QTM 220 HW #8"
+author: "Veronica Vargas"
+format: html
+editor: visual
+---
+
+# QTM 220 HW #8
+
+## Exercise #1
+
+```{r}
+library(tidyverse)
+library(experimentr)
+library(ggplot2)
+library(mosaic)
+library(datasets)
+library(leaps)
+library(caret)
+library(ISLR2)
+```
+
+```{r}
+data("easton")
+head(easton)
+```
+
+### (a) Scatterplot
+
+```{r}
+ggplot(easton, aes(x = treatment_republican_profile, y = attractiveness_score)) +
+  geom_point(aes(x = treatment_republican_profile, y = attractiveness_score, color = factor(treatment_republican_profile)),
+             alpha = 0.3) +
+  labs(
+    title = "Treatment vs. Attractiveness Profile",
+    x = "Treatment",
+    y = "Attractiveness Profile",
+    color = "Treatment") +
+  theme_minimal()
+```
+
+### (b) Average Treatment Effect (ATE)
+
+```{r}
+mean(easton$attractiveness_score[easton$treatment_republican_profile == 1]) - mean(easton$attractiveness_score[easton$treatment_republican_profile == 0])
+```
+
+### (c) Linear Regression
+
+```{r}
+model <- lm(attractiveness_score ~ treatment_republican_profile, data = easton)
+summary(model)
+```
+
+```{r}
+predicted_easton <- data.frame(attractiveness_score =  predict(model), treatment_republican_profile = easton$treatment_republican_profile)
+```
+
+```{r}
+ggplot(easton, aes(x = treatment_republican_profile, y = attractiveness_score)) +
+  geom_point(aes(x = treatment_republican_profile, y = attractiveness_score, color = factor(treatment_republican_profile)),
+             alpha = 0.3) +
+geom_line(data = predicted_easton,
+            aes(x = treatment_republican_profile, y = attractiveness_score),color='darkorange', lwd= 1) +
+  labs(
+    title = "Treatment vs. Attractiveness Profile",
+    x = "Treatment",
+    y = "Attractiveness Profile",
+    color = "Treatment") +
+  theme_minimal()
+```
+
+The estimates from my linear regression are the same as those calculated by sub-sample means in the average treatment effect (ATE). Furthermore, while the ATE measures the difference in sub-sample means, the slope (or coefficient beta) of the line of best fit is roughly the same as the ATE.
+
+### (d) Diagnostic Plots
+
+```{r}
+mplot(model, which = 1:2)
+```
+
+By looking at the residuals vs fitted plot, we see that the points are generally centered around 0, as according to the line of best fit. Furthermore, looking at the Normal Q-Q plot, we see that the tails diverge from the line at either extreme. Therefore, while this model meets the assumption of mean zero, it does not meet the assumption of homoscedasticity by looking at both models respectively.
+
+```{r}
+hist(model$residuals, prob = TRUE, breaks = 20, col = "lightcoral", main = "Residual Histogram")
+
+grid = sort(model$residuals) 
+lines(grid,
+      dnorm(grid,
+            mean = mean(model$residuals),
+            sd = sd(model$residuals)), 
+      col = 'maroon', lwd = 2 ) 
+```
+
+Finally, looking at the residual histogram plot, we see that the histogram follows the density line. Therefore, we can suppose that the residuals are normally distributed.
+
+### (e) Conditional Average Treatment Effect (CATE)
+
+```{r}
+cate <- easton %>%
+  group_by(republican) %>%
+  summarise(
+    N_Treated = sum(treatment_republican_profile == 1),
+    N_Control = sum(treatment_republican_profile == 0),
+    Mean_Treated = mean(attractiveness_score[treatment_republican_profile == 1]),
+    Mean_Control = mean(attractiveness_score[treatment_republican_profile == 0]),
+    CATE = Mean_Treated - Mean_Control
+  ) %>%
+  ungroup()
+
+print(cate)
+```
+
+### (f) Linear Regression Scatter Plot w/ Interaction
+
+```{r}
+model <- lm(attractiveness_score ~ treatment_republican_profile + republican + treatment_republican_profile*republican, data = easton)
+summary(model)
+```
+
+```{r}
+republican_seq <- seq(min(easton$republican), max(easton$republican), by = 1)
+
+pred_data <- expand.grid(
+  republican = republican_seq,
+  treatment_republican_profile = c(0, 1))
+
+pred_data$treatment_republican_profile <- as.numeric(pred_data$treatment_republican_profile)
+
+pred_data$predicted_score <- predict(model, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = easton, aes(x = treatment_republican_profile, y = attractiveness_score, color = factor(republican)),
+             alpha = 0.3, position = position_dodge(width = 0.5)) +
+  geom_line(data = pred_data, aes(x = treatment_republican_profile, y = predicted_score, 
+                                  color = factor(republican)), size = 1) +
+  labs(
+    title = "Easton Nonparallel Lines Predictive Model",
+    x = "Treatment",
+    y = "Attractiveness Score",
+    color = "Political Affilation"
+  ) +
+  theme_minimal()
+
+```
+
+The CATEs are the difference between the values estimated by the linear regression conditioning for each political affiliation.
+
+### (g) Diagnostics Plots
+
+```{r}
+mplot(model, which = 1:2)
+```
+
+Looking at the Normal Q-Q plot, we see that the tails diverge from the line at either extreme, so the model does not meet the assumption of homoscedasticity. Also, looking at the Residuals vs Fitted plot, we see that the line of best fit is centered around zero, meaning that the model meets the mean zero assumption.
+
+```{r}
+hist(model$residuals, prob = TRUE, breaks = 20, col = "lightcoral", main = "Residual Histogram")
+
+grid = sort(model$residuals) 
+lines(grid,
+      dnorm(grid,
+            mean = mean(model$residuals),
+            sd = sd(model$residuals)), 
+      col = 'maroon', lwd = 2 ) 
+```
+
+Finally, by looking at the Residual Histogram, we see that the histogram does not accurately follow the density line. Therefore, we can assume that the residuals of the model are not normally distributed.
+
+### (h) Linear Regression
+
+Before looking at the estimates, I expect the coefficients on my model to be different from those in (f). This is because age is definitely a factor that some people may find attractive or unattractive. Therefore, it will likely affect the relationship between treatment and attractiveness score. I do think that the standard errors from my coefficients will be different from (f). It's possible that while age affects the relationship of interest, it might also add noise and affect the variance.
+
+```{r}
+model <- lm(attractiveness_score ~ treatment_republican_profile + republican + age + treatment_republican_profile*republican, data = easton)
+summary(model)
+```
+
+After looking at the results, the coefficients in this model are roughly the same as those in the previous model. This means that political affiliation likely does not affect the relationship between treatment and attractiveness score. Additionally, the standard errors in this model were very similar to the standard errors in the previous model. This is because the covariate of age likely has little to do with the relationship between treatment effect and attractiveness score.
+
+```{r}
+mplot(model, which = 1:2)
+```
+
+By looking at the Normal Q-Q plot, we see that we see that the tails diverge from the line at either extreme, so the model does not meet the assumption of homoscedasticity. Furthermore, looking at the Residuals vs Fitted model, we see that the points are scattered as random clouds of points falling within an area representing a horizontal band. Therefore, while the points are incredibly scattered they meet the assumption of mean zero as according to the line of best fit.
+
+```{r}
+hist(model$residuals, prob = TRUE, breaks = 20, col = "lightcoral", main = "Residual Histogram")
+
+grid = sort(model$residuals) 
+lines(grid,
+      dnorm(grid,
+            mean = mean(model$residuals),
+            sd = sd(model$residuals)), 
+      col = 'maroon', lwd = 2 ) 
+```
+
+Finally, by looking at the Residual Histogram, we see that the histogram does not follow the density line. Therefore, we can suppose that the residuals are not normally distributed.
+
+## Exercise #2
+
+```{r}
+data("mtcars")
+head(mtcars)
+```
+
+### (a) Scatter Plot
+
+```{r}
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point(aes(x = wt, y = mpg), alpha = 0.3) +
+  labs(
+    title = "Weight (kg) vs. Miles per Gallon",
+    x = "Weight (kg)",
+    y = "Miles per Gallon") +
+  theme_minimal()
+```
+
+### (b) Linear Regression Scatter Plot
+
+```{r}
+model <- lm(mpg ~ wt, data = mtcars)
+summary(model)
+```
+
+```{r}
+predicted_mtcars <- data.frame(mpg =  predict(model), wt = mtcars$wt)
+```
+
+```{r}
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point(aes(x = wt, y = mpg), alpha = 0.3) +
+geom_line(data = predicted_mtcars,
+            aes(x = wt, y = mpg),color='darkorange', lwd= 1) +
+  labs(
+    title = "Weight (kg) vs. Miles per Gallon Line of Best Fit",
+    x = "Weight (kg)",
+    y = "Miles per Gallon") +
+  theme_minimal()
+```
+
+When looking at the linear regression, the first coefficient of 37.2851 is the intercept of the line. Therefore, this is the baseline value of the model. The following coefficient of -5.3445 is the slope of the line of best fit. In other words, on average the miles per gallon decreases by -5.3445 for each additional unit of weight (presumably kg).
+
+### (c) Diagnostics Plots
+
+```{r}
+mplot(model, which = 1:2)
+```
+
+When looking at the Normal Q-Q plot, we see that the points are following the line with the exception of a few outliers. Therefore, this model meets the assumption of homoscedasticity if we chose to exclude those points. Furthermore, looking at the Residuals vs Fitted plot, we see that the lines are not all around 0. Therefore, this model does not meet the assumption of mean zero.
+
+```{r}
+hist(model$residuals, prob = TRUE, breaks = 20, col = "lightcoral", main = "Residual Histogram")
+
+grid = sort(model$residuals) 
+lines(grid,
+      dnorm(grid,
+            mean = mean(model$residuals),
+            sd = sd(model$residuals)), 
+      col = 'maroon', lwd = 2 ) 
+```
+
+Finally, looking at the Residual Histogram, we see that the histogram does not follow the density line. Therefore we can suppose that the residuals are not normally distributed. The graph is closer to a uniform distribution.
+
+### (d) Linear Regression Scatter Plot w/ Interaction
+
+```{r}
+model <- lm(mpg ~ wt + am + wt*am, data = mtcars)
+summary(model)
+```
+
+```{r}
+wt_seq <- seq(min(mtcars$wt), max(mtcars$wt), by = 1)
+
+pred_data <- expand.grid(
+  wt = wt_seq,
+  am = c(0,1))
+
+pred_data$predicted_mpg <- predict(model, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = mtcars, aes(x = wt, y = mpg, color = factor(am)),
+             alpha = 0.3) + 
+  geom_line(data = pred_data, aes(x = wt, y = predicted_mpg, color = factor(am)), size = 1) +
+  labs(
+    title = "mtcars Nonparallel Lines Predictive Model",
+    x = "Weight (kg)",
+    y = "Miles per Gallon",
+    color = "Transmission Type"  
+  ) +
+  theme_minimal()
+```
+
+Looking at the nonparallel lines model, we see that the relationship between weight and miles per gallon is more negatively affected by the an automatic transmission type than a manual transmission type. This is because the slope for an automatic is steeper than the slope for the manual.
+
+### (e) Diagnostic Plots
+
+```{r}
+mplot(model, which = 1:2)
+```
+
+Looking at the Normal Q-Q plot, we see that the points follow the line but trail off at the extreme. Therefore, this model does not meet the assumption of homoscedasticity. Furthermore, looking at the Residuals vs Fitted Lines plot, we see that the points are generally close to zero, meaning that this model meets the mean zero assumption.
+
+```{r}
+hist(model$residuals, prob = TRUE, breaks = 20, col = "lightcoral", main = "Residual Histogram")
+
+grid = sort(model$residuals) 
+lines(grid,
+      dnorm(grid,
+            mean = mean(model$residuals),
+            sd = sd(model$residuals)), 
+      col = 'maroon', lwd = 2 )
+```
+
+Finally, looking at the Residual Histogram plot, we see that the histogram does not follow the density line. Therefore, we can suppose that the residuals are not normally distributed.
+
+### (f) Linear Regression Scatter Plot w/ Interaction
+
+Before looking at the results, I expect the coefficients to be different from those in the previous model. This is because I expect miles per gallon to increase as horse power increases. Additionally, because I expect there to be a relationship between horse power and and miles per gallon, I expect the standard errors to differ.
+
+```{r}
+model <- lm(mpg ~ wt + am + hp + wt*am, data = mtcars)
+summary(model)
+```
+
+After looking at the results, the intercept did not change by a lot, but the interaction variable changed and the am variable changed. Therefore, the horse power likely has a relationship with the transmission type which, in turn, effects the interaction variable. As such, the horse power variable likely has an indirect effect on the miles per gallon since the baseline did not feature significant change. Furthermore, the standard error did not change. This is likely because the horse power does not directly affect the other variables.
+
+### (g) Diagnostic Plots
+
+```{r}
+mplot(model, which = 1:2)
+```
+
+Looking at the Normal Q-Q plot, we see that the points do not follow the line. Therefore, this model does not meet the assumption of homoscedasticity. Furthermore, looking at the Residuals vs Fitted Plot, we see the points are generally around zero. Therefore, the model meets the mean zero assumption.
+
+```{r}
+hist(model$residuals, prob = TRUE, breaks = 20, col = "lightcoral", main = "Residual Histogram")
+
+grid = sort(model$residuals) 
+lines(grid,
+      dnorm(grid,
+            mean = mean(model$residuals),
+            sd = sd(model$residuals)), 
+      col = 'maroon', lwd = 2 ) 
+```
+
+Finally looking at the Residual Histogram, we see that the histogram does not follow the density line. Therefore, we can suppose that the residuals are not normally distributed.
+
+### (h) Two Linear Models w/ 5-fold Validation
+
+```{r}
+model <- lm(mpg ~ cyl + hp + cyl*hp, data = mtcars)
+summary(model)
+```
+
+```{r}
+model <- lm(mpg ~ cyl + disp + cyl*disp, data = mtcars)
+summary(model)
+```
+
+For both models, the only variable I changed between them was the variable displacement and the horsepower. This is because I expect horsepower to indirectly affect the relationship between miles per gallon whereas displacement is arbitrary. Furthermore, the number of cylinders inversely correlates with fuel efficiency. Therefore, I expect miles per gallon to increase with the number of cylinders.
+
+```{r}
+rss_summary <- function(data, lev = NULL, model = NULL) {
+  residuals <- data$obs - data$pred
+  rss <- sum(residuals^2)
+  rmse <- sqrt(mean(residuals^2))
+  return(c(RMSE = rmse, RSS = rss))
+}
+```
+
+```{r}
+train_control_kfold <- trainControl(
+  method = "cv",                
+  number = 5,                  
+  summaryFunction = rss_summary,
+  savePredictions = "final",  
+  classProbs = FALSE, 
+  allowParallel = FALSE)
+
+# Train Model A: Parallel Lines Model
+set.seed(123) 
+model_A_caret <- train(
+  mpg ~ cyl + hp + cyl*hp,
+  data = mtcars,
+  method = "lm",
+  trControl = train_control_kfold,
+  metric = "RMSE")
+
+# Train Model B: Nonparallel Lines Model
+set.seed(123) 
+model_B_caret <- train(
+  mpg ~ cyl + disp + cyl*disp,
+  data = mtcars,
+  method = "lm",
+  trControl = train_control_kfold,
+  metric = "RMSE")
+
+model_A_caret$results
+model_B_caret$results
+```
+
+Looking at the RMSE values for each mode, I actually prefer model B. This is because the Mean Squared Error is less in model B than it is in model A. Meaning that horse power likely adds noise to the model and should not be included as a covariate.

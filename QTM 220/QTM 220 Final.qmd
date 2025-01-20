@@ -1,0 +1,503 @@
+---
+title: "QTM 220 Final"
+author: "Veronica Vargas"
+format: html
+editor: visual
+---
+
+```{r}
+## HW 1-4
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+## HW 6 - Cross Validation
+library(mosaic)
+library(mosaicData)
+library(leaps)
+library(caret)
+library(ISLR2)
+
+## HW 7 - Confidence Intervals for Regression Modeling
+library(datasets)
+library(boot)
+library(lmtest) # sandwich package
+
+## HW 8 - Diagnostic Plots
+library(experimentr)
+library(datasets)
+```
+
+```{r}
+pokemon.data <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/pokemon_final_exam_data.csv")
+
+pokemon.data <- pokemon.data %>%
+  filter(Generation %in% c(1, 2, 3, 4, 5, 6, 7))
+
+head(pokemon.data)
+summary(pokemon.data)
+```
+
+# Exercise #1
+
+## (a) Scatter Plot #1-2
+
+```{r}
+mod.simple <- lm(Speed ~ SP_Defense, data = pokemon.data)
+summary(mod.simple)
+
+pokemon.data$predicted_score_simple <- predict(mod.simple)
+
+ggplot(pokemon.data, aes(x = SP_Defense, y = Speed)) +
+  geom_point(aes(x = SP_Defense, y = Speed),
+             alpha = 0.3) +
+  geom_line(aes(y = predicted_score_simple), color = "orange", size = 1) +
+  labs(
+    title = "SP Defense vs. Speed",
+    x = "SP Defense",
+    y = "Speed") +
+  theme_minimal()
+```
+
+```{r}
+mod.simple <- lm(Speed ~ SP_Attack, data = pokemon.data)
+summary(mod.simple)
+
+pokemon.data$predicted_score_simple <- predict(mod.simple)
+
+ggplot(pokemon.data, aes(x = SP_Attack, y = Speed)) +
+  geom_point(aes(x = SP_Attack, y = Speed),
+             alpha = 0.3) +
+  geom_line(aes(y = predicted_score_simple), color = "orange", size = 1) +
+  labs(
+    title = "SP Attack vs. Speed",
+    x = "SP Attack",
+    y = "Speed") +
+  theme_minimal()
+```
+
+SP Attack is more highly correlated with Speed. When we're looking at the coefficients for each simple regression model, the coefficient between SP Attack and Speed is 0.41614, which is larger than the coefficient between SP Defense and Speed which is 0.24067.
+
+## (b) Quantile w/ Bootstrapped Estimated Sampling Distribution
+
+```{r}
+quantile(pokemon.data$SP_Attack, 0.85)
+```
+
+```{r}
+n <- 10000
+df <-  rep(NA, n) 
+
+for(i in 1:n){
+  sample <- sample(pokemon.data$SP_Attack, 940, replace = T)
+  
+  df[i] <- quantile(sample, 0.85)
+}
+```
+
+```{r}
+ggplot(data = data.frame(df = df), aes(x = df)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, Type1 = "identity") +
+  geom_vline(xintercept = mean(df), linetype="dashed",
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(df, 0.025), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) +
+    geom_vline(xintercept = quantile(df, 0.975), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + 
+  theme_minimal()
+```
+
+```{r}
+lower.bound <- quantile(df, 0.05)
+upper.bound <- quantile(df, 0.95)
+
+print(paste0("The Bootstrapped 90% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+If we were to repeat this experiment under the same conditions with a sufficiently large sample size, the quantile 85 would fall somewhere within the estimated interval for about 95 out of 100 trials. In this experiment, expected value of the quantile 85 for our estimator is predicted to be somewhere in between 105 and 110.
+
+## (c) Not-Necessarily Parallel Lines Model #1
+
+```{r}
+mod.interaction1 <- lm(Speed ~ SP_Attack + Type1 + SP_Attack*Type1, data = pokemon.data)
+summary(mod.interaction1)
+```
+
+According to the summary, there are least four predictors that is in a relationship with the response variable. These predictor variables are SP_Attack, Type1Electric, Type1Normal, and the SP_Attack\*Type1Fire interaction variable. These are distinguishable due to their reported p-value being less than 0.05.
+
+## (d) Not-Necessarily Parallel Lines Model #2
+
+```{r}
+mod.interaction2 <- lm(Speed ~ SP_Defense + Type1 + SP_Defense*Type1, data = pokemon.data)
+summary(mod.interaction2)
+```
+
+The multiple R-squared is 0.1493, meaning that 0.1493 of the variance can be explained by the relationships in the model. Since this number is very low, it's likely that this combination of predictor variables in this multivariate regression do not have much to do with the response variable.
+
+## (e) LOOCV
+
+```{r}
+rss_summary <- function(data, lev = NULL, model = NULL) {
+  residuals <- data$obs - data$pred
+  rss <- sum(residuals^2)
+  rmse <- sqrt(mean(residuals^2))
+  return(c(RMSE = rmse, RSS = rss))
+}
+```
+
+```{r}
+train_control_loocv <- trainControl(
+  method = "LOOCV",             
+  summaryFunction = rss_summary,
+  savePredictions = "all",    
+  classProbs = FALSE,           
+  allowParallel = FALSE         
+)
+
+# Train Model A: Model #1
+set.seed(123)  
+model_A_caret_loocv <- train(
+  Speed ~ SP_Attack + Type1 + SP_Attack*Type1,
+  data = pokemon.data,
+  method = "lm",
+  trControl = train_control_loocv,
+  metric = "RMSE"  
+)
+
+# Train Model B: Model #2
+set.seed(123)  
+model_B_caret_loocv <- train(
+  Speed ~ SP_Defense + Type1 + SP_Defense*Type1,
+  data = pokemon.data,
+  method = "lm",
+  trControl = train_control_loocv,
+  metric = "RMSE" 
+)
+
+model_A_caret_loocv$results
+model_B_caret_loocv$results
+```
+
+Using the LOOCV, I prefer Model #1 since the RMSE value is lower than the RMSE of Model #2. In other words, Model #1 features less error than Model #2.
+
+Model #1 Equation
+
+Speed = SP_Attack + Type1 + SP_Attack\*Type1
+
+## (f) Scatter Plot of Model #2
+
+```{r}
+defense_seq <- seq(min(pokemon.data$SP_Defense), max(pokemon.data$SP_Defense), by = 1)
+
+pred_data <- expand.grid(
+  SP_Defense = defense_seq,
+  Type1 = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18))
+
+pred_data$Type1 <- factor(pred_data$Type1,
+                             levels = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18), 
+                             labels = c( "Grass",    "Fire", "Water", "Bug", "Normal", "Dark", "Poison", "Electric", "Ground", "Ice", "Fairy", "Fighting", "Psychic", "Rock", "Ghost", "Dragon", "Steel", "Flying"))
+
+pred_data$predicted_speed <- predict(mod.interaction2, newdata = pred_data)
+
+ggplot() +
+  geom_point(data = pokemon.data, aes(x = SP_Defense, y = Speed, color = Type1),
+             alpha = 0.3) +
+  geom_line(data = pred_data, aes(x = SP_Defense, y = predicted_speed, 
+                                  color = Type1), size = 1) +
+  labs(
+    title = "Sample Non-Parallel Lines Predictive Model",
+    x = "Speed",
+    y = "SP Defense",
+    color = "Type"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+coef(mod.interaction2)
+```
+
+Fairy Type Equation
+
+Speed = 58.65 + 0.066xSP_Defense + 0.483xSP_Defense:Type1Fairy
+
+## (g) Diagnostic Plots
+
+```{r}
+mplot(mod.interaction1, which = 2)
+```
+
+```{r}
+hist(mod.interaction1$residuals, prob = TRUE, breaks = 20, col = "lightcoral", main = "Residual Histogram")
+
+grid = sort(mod.interaction1$residuals) 
+lines(grid,
+      dnorm(grid,
+            mean = mean(mod.interaction1$residuals),
+            sd = sd(mod.interaction1$residuals)), 
+      col = 'maroon', lwd = 2) 
+```
+
+The points follow the line in the Q-Q plot and the histogram follows the density line, meaning that this data meets the assumption of normally distributed residuals.
+
+## (h) Mean Zero & Homoscedasticity
+
+```{r}
+mplot(mod.interaction1, which = c(1, 3))
+```
+
+While the mean line is around zero, the residuals are scattered all over the place (the residuals are all different), meaning that while this data meets the assumption of mean zero, it does not meet the assumption of homoscedasticity.
+
+## (i) 95% Confidence Interval (CI)
+
+```{r}
+mod.simple <- lm(Speed ~ SP_Defense, data = pokemon.data)
+```
+
+```{r}
+coef_hp <- coef(mod.simple)["SP_Defense"]
+se_hp <- summary(mod.simple)$coefficients["SP_Defense", "Std. Error"]
+
+df <- mod.simple$df.residual
+t_critical <- qt(1 - 0.05 / 2, df)
+
+lower_bound <- coef_hp - t_critical * se_hp
+upper_bound <- coef_hp + t_critical * se_hp
+
+lower_bound
+upper_bound
+```
+
+```{r}
+boot_fn <- function(data, indices) {
+  d <- data[indices, ]
+  fit <- lm(Speed ~ SP_Defense, data = d)
+  return(coef(fit))
+}
+```
+
+```{r}
+set.seed(123) 
+boot_results <- boot(data = pokemon.data, statistic = boot_fn, R = 10000)
+```
+
+```{r}
+boot_results
+```
+
+Considering that this model does not meet the assumption of homoscedasticity but does meet the assumptions of mean zero and normality, it would be okay to use the R summary to calculate the 95% CI. The bootstrapped method would be okay as well, but it might be better to use R summary since we are meeting multiple assumptions rather than none.
+
+## (j) New Estimator
+
+```{r}
+pokemon.subsample <- pokemon.data %>%
+  filter ( Type1 %in% c("Dragon", "Bug")) %>%
+  select (Name, Generation, Type1, HP )
+
+head(pokemon.subsample)
+summary(pokemon.subsample)
+```
+
+```{r}
+## raw difference in mean HP
+dragon <- pokemon.subsample[pokemon.subsample$Type1 == "Dragon",]
+bug <- pokemon.subsample[pokemon.subsample$Type1 == "Bug",]
+
+mean(dragon$HP) 
+mean(bug$HP)
+
+mean(dragon$HP) - mean(bug$HP)
+```
+
+```{r}
+## difference in mean HP with a focus on bug pokemon
+
+bug <- bug %>%
+  group_by(Generation) %>%
+  summarise(avg_HP_bug = mean(HP, na.rm = TRUE), n_bug = n()) %>%
+  ungroup()
+  
+dragon <- dragon %>%
+  group_by(Generation) %>%
+  summarise(avg_HP_dragon = mean(HP, na.rm = TRUE), n_dragon = n()) %>%
+  ungroup()
+  
+df <- full_join(bug, dragon, by = "Generation")
+
+df <- df %>%
+  mutate(mean_diff = coalesce(avg_HP_bug, 0) - coalesce(avg_HP_dragon, 0))
+
+(1/sum(df$n_bug)) * sum(df$n_bug * df$mean_diff)
+```
+
+```{r}
+mod.simple <- lm(HP ~ Type1, data = pokemon.subsample)
+summary(mod.simple)
+
+ggplot(pokemon.subsample, aes(x = Type1, y = HP, color = Type1)) +
+  geom_jitter(width = 0.3, alpha = 0.5) +
+  geom_point(aes(y = fitted(mod.simple)), color = "black", shape = 1, size = 2) +
+  theme_minimal() +
+  labs(title = "HP by Pokemon Type", x = "Type", y = "HP")
+```
+
+I would like to use the second estimator to maximize the difference in HP. As we can see from the two estimators, the second one is the one that features the highest absolute difference. Furthermore, we see that the groups are not balanced, we seem to have more bug pokemon than dragon pokemon. Therefore, we would want to pick the estimator that focuses on the largest subgroup to maximize the difference in HP, which in this case, is the second one.
+
+# Exercise #2
+
+```{r}
+library(gmm)
+data("nsw")
+
+head(nsw)
+summary(nsw)
+```
+
+## (a) Average Treatment Effect (ATE)
+
+```{r}
+treat <- nsw %>%
+  filter(treat == 1)
+
+untreat <- nsw %>%
+  filter(treat == 0)
+
+mean(treat$re78) - mean(untreat$re78)
+```
+
+This is the raw difference in mean earnings between those that were treated and those that were untreated across all groups.
+
+## (b) Bootstrapped 95% CI (ATE)
+
+```{r}
+set.seed(123)
+
+n <- 10000
+ate_boot <- rep(NA, n)
+
+for(i in 1:n){
+  sample <-  nsw[sample(1:nrow(nsw), nrow(nsw), replace = T),]
+  
+  treat <- sample %>%
+  filter(treat == 1)
+
+untreat <- sample %>%
+  filter(treat == 0)
+
+  ate_boot[i] <- mean(treat$re78) - mean(untreat$re78)
+}
+```
+
+```{r}
+lower.bound <- quantile(ate_boot, 0.025)
+upper.bound <- quantile(ate_boot, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+If we were to repeat this experiment under the same conditions with a sufficiently large sample size, the average treatment effect would fall somewhere within the estimated interval for about 95 out of 100 trials. In this experiment, expected average treatment effect for our estimator is predicted to be somewhere in between -56.74 and 1857.96.
+
+## (c) Least Squares Regression
+
+```{r}
+model <- lm(re78 ~ treat, data = nsw)
+summary(model)
+```
+
+```{r}
+predicted_re78 <- data.frame(re78 =  predict(model), treat = nsw$treat)
+```
+
+```{r}
+ggplot(nsw, aes(x = treat, y = re78)) +
+  geom_point(aes(x = treat, y = re78, color = factor(treat)),
+             alpha = 0.3) +
+geom_line(data = predicted_re78,
+            aes(x = treat, y = re78),color='darkorange', lwd= 1) +
+  labs(
+    title = "Treatment vs. 1978 Earnings",
+    x = "Treatment",
+    y = "1978 Earnings",
+    color = "Treatment") +
+  theme_minimal()
+```
+
+The intercept describes the average baseline salary for both treatment and control groups at the start of the study. Finally, the treat coefficient represents the average difference in salary between treated and untreated individuals. In other words, the average treatment effect. Here, the average treatment effect is estimated to be \~ \$886.
+
+## (d) Discussion
+
+I would say that adding certain factors would deffinitely change the average treatment effect. For instance, the variable of marriage will add an additional source of income. Respondents would likely submit a higher value for the household salary if they were living with their spouse. Therefore, it's important to consider covariates when estimating the average treatment effect.
+
+```{r}
+model <- lm(re78 ~ treat + married, data = nsw)
+summary(model)
+```
+
+## (e) Difference in Means (CATE)
+
+```{r}
+df <- nsw %>%
+  group_by(nodeg) %>%
+  summarise(
+    N_Total = n(),
+    N_Treated = sum(treat == 1),
+    N_Control = sum(treat == 0),
+    Mean_Treated = mean(re78[treat == 1]),
+    Mean_Control = mean(re78[treat == 0]),
+    CATE = Mean_Treated - Mean_Control
+  ) %>%
+  ungroup()
+
+df
+```
+
+These estimates are not causally identified because we are not conditioning treatment on whether an individual has a high school diploma or not.
+
+## (f) Standardized CATE
+
+```{r}
+df <- df %>%
+  mutate(CATE_standard = (N_Total/sum(N_Total))*CATE)
+
+sum(df$CATE_standard)
+```
+
+This value is less than my estimated ATE. This is likely because by conditioning on high school diploma you remove potential discrepancies by education. Therefore, the difference in the treatment is not so stark.
+
+## (g) Least Squares Regression
+
+```{r}
+model <- lm(re78 ~ treat + nodeg + treat*nodeg, data = nsw)
+summary(model)
+```
+
+Using this least squares regression, the intercept gives the mean earnings for the control group, otherwise known as the baseline. Additionally, the treat coefficient specifies how much change there is in earnings for each unit of treatment. In this case, this represented the CATE for those without a high school diploma. Additionally, the nodeg coefficient represents the change in earnings for each unit of nodeg. In other words, the earnings decrease by \~ \$1017 on average for those with a high school diploma. Finally, the interaction coefficient, represents the relationship between treatment and nodeg, where those that have a high school diploma are less likely to receive treatment. The difference between the treat coefficient and the interaction variable represents the CATE for those without a high school diploma.
+
+## (h) Bootstrapped Estimated Sampling Distribution
+
+```{r}
+boot_fn <- function(data, indices) {
+  d <- data[indices, ]
+  fit <- lm(re78 ~ treat + nodeg + treat*nodeg, data = d)
+  return(coef(fit))
+}
+```
+
+```{r}
+set.seed(123) 
+boot_results <- boot(data = nsw, statistic = boot_fn, R = 10000)
+```
+
+```{r}
+boot_results
+```
+
+```{r}
+boot.ci(boot_results, type = "perc", index = 2)
+```
+
+```{r}
+boot.ci(boot_results, type = "perc", index = 4)
+```
+
+If we were to repeat this experiment under the same conditions with a sufficiently large sample size, the conditional average treatment effect would fall somewhere within the estimated interval for about 95 out of 100 trials. In this experiment, expected conditional average treatment effect for those without a high school diploma is predicted to be somewhere in between -1003 and 3312. Also, the expected conditional average treatment effect for this experiment for those with a high school diploma is expected to fall somewhere between -1841 and 1335 (if you were to subtract the values from both CI above).

@@ -1,0 +1,258 @@
+---
+title: "QTM 220 HW #2"
+format: html
+editor: visual
+---
+
+# Exercise #2
+
+## Estimated Sampling Distributions
+
+```{r}
+library(tidyverse)
+nba.sample.data <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/nba.sample.data.csv")
+
+head(nba.sample.data)
+summary(nba.sample.data)
+```
+
+### (a) Sampling Summary Statistics
+
+```{r}
+mean(nba.sample.data$PTS)
+sd(nba.sample.data$PTS)
+```
+
+```{r}
+## plug-in method
+sample.mean <- mean(nba.sample.data$PTS)
+sample.sd <- sd(nba.sample.data$PTS)
+
+est.mean.se <- sample.sd/sqrt(length(nba.sample.data))
+q <- qnorm(1 - 0.05/2)
+n <- length(nba.sample.data)
+
+lower.bound <- sample.mean - q*est.mean.se
+upper.bound <- sample.mean + q*est.mean.se
+```
+
+```{r}
+ggplot(data = nba.sample.data, aes(x = PTS)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = 'identity') +
+   geom_vline(xintercept = sample.mean, linetype="dotted", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = lower.bound, linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) +
+    geom_vline(xintercept = upper.bound, linetype = "dotted", 
+                color = "darkorchid", linewidth=1) +
+  theme_minimal()
+```
+
+### (b) Calibrating 95% CI w/ Bootstrapped Sample
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n){
+  sampled.PTS <- sample(nba.sample.data$PTS, 1000, replace = T)
+  x_bar[i] <- mean(sampled.PTS)
+}
+```
+
+```{r}
+mean(x_bar)
+sd(x_bar)
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(x_bar) + (1.96 * sd(x_bar)), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + # plus 1.96 stdev
+    geom_vline(xintercept = mean(x_bar) - (1.96 * sd(x_bar)), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + # minus 1.96 stdev
+  theme_minimal() 
+```
+
+```{r}
+lower.bound <- mean(x_bar) - (1.96 * sd(x_bar))
+upper.bound <- mean(x_bar) + (1.96 * sd(x_bar))
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (c) Calculating 90% CI, 95% CI, and 99% CI
+
+```{r}
+## 90% CI
+quantile(x_bar, c(0.05,0.95))
+
+## 95% CI
+quantile(x_bar, c(0.05, 0.975))
+
+## 99% CI
+quantile(x_bar, c(0.005, 0.995))
+```
+
+As the interval increases as the CI gets larger. For instance, the interval for the 90% CI is smaller than the interval for the 95% CI and the interval for the 99% CI is larger than the interval or the 95% CI.
+
+### (d) Plug-In Method
+
+```{r}
+sample.mean <- mean(nba.sample.data$PTS)
+sample.sd <- sd(nba.sample.data$PTS)
+
+est.mean.se <- sample.sd/sqrt(length(nba.sample.data))
+q <- qnorm(1 - 0.05/2)
+n <- length(nba.sample.data)
+
+lower.bound <- sample.mean - q*est.mean.se
+upper.bound <- sample.mean + q*est.mean.se
+
+print(paste0("The Plug-in 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+Here, the interval for the plug-in method is much wider than the bootstrap estimated version.
+
+### (e) Repeating w/ Alternate Sample
+
+```{r}
+nba.sample.data.alt <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/nba.sample.data.alt.csv")
+
+head(nba.sample.data.alt)
+summary(nba.sample.data.alt)
+```
+
+```{r}
+mean(nba.sample.data.alt$PTS)
+sd(nba.sample.data.alt$PTS)
+```
+
+```{r}
+## plug-in method
+sample.mean <- mean(nba.sample.data.alt$PTS)
+sample.sd <- sd(nba.sample.data.alt$PTS)
+
+est.mean.se <- sample.sd/sqrt(length(nba.sample.data.alt))
+q <- qnorm(1 - 0.05/2)
+n <- length(nba.sample.data.alt)
+
+lower.bound <- sample.mean - q*est.mean.se
+upper.bound <- sample.mean + q*est.mean.se
+```
+
+```{r}
+ggplot(data = nba.sample.data.alt, aes(x = PTS)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = 'identity') +
+   geom_vline(xintercept = sample.mean, linetype="dotted", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = lower.bound, linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) +
+    geom_vline(xintercept = upper.bound, linetype = "dotted", 
+                color = "darkorchid", linewidth=1) +
+  theme_minimal()
+```
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n){
+  sampled.PTS <- sample(nba.sample.data.alt$PTS, 1000, replace = T)
+  x_bar[i] <- mean(sampled.PTS)
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(x_bar) + (1.96 * sd(x_bar)), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + # plus 1.96 stdev
+    geom_vline(xintercept = mean(x_bar) - (1.96 * sd(x_bar)), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + # minus 1.96 stdev
+  theme_minimal() 
+```
+
+```{r}
+lower.bound <- mean(x_bar) - (1.96 * sd(x_bar))
+upper.bound <- mean(x_bar) + (1.96 * sd(x_bar))
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+```{r}
+sample.mean <- mean(nba.sample.data.alt$PTS)
+sample.sd <- sd(nba.sample.data.alt$PTS)
+
+est.mean.se <- sample.sd/sqrt(length(nba.sample.data.alt))
+q <- qnorm(1 - 0.05/2)
+n <- length(nba.sample.data.alt)
+
+lower.bound <- sample.mean - q*est.mean.se
+upper.bound <- sample.mean + q*est.mean.se
+
+print(paste0("The Plug-in 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+For the mean in the original sample is larger than the mean in the alternative sample. Conversely, the standard deviation of the original sample is very similar that of the alternative sample. Finally, the 95% CI for both samples is roughly the same, but the internal is slightly skewed to the left for the alternative sample. This is likely because the mean of the alternative sample is smaller than the mean of the original sample.
+
+# Exercise #3
+
+## Comparing Sample and Population
+
+```{r}
+nba.data <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/nba.data.csv")
+
+head(nba.data)
+summary(nba.data)
+```
+
+### (a) Calculating Population Mean
+
+```{r}
+mean(nba.data$PTS)
+sd(nba.data$PTS)
+```
+
+### (b) Population Sampling Distribution
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n)
+
+for(i in 1:n){
+  x_bar[i] <- mean(sample(nba.data$PTS, length(nba.data$PTS), replace = T))
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(x_bar) + (1.96 * sd(x_bar)), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + # plus 1.96 stdev
+    geom_vline(xintercept = mean(x_bar) - (1.96 * sd(x_bar)), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + # minus 1.96 stdev
+  theme_minimal() 
+```
+
+```{r}
+lower.bound <- mean(x_bar) - (1.96 * sd(x_bar))
+upper.bound <- mean(x_bar) + (1.96 * sd(x_bar))
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+The width of the bootstrapped 95% CI from the population is much wider than the intervals created by either of the previous samples.

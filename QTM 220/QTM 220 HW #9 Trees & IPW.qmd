@@ -1,0 +1,168 @@
+---
+title: "QTM 220 HW #9"
+author: "Veronica Vargas"
+format: html
+editor: visual
+---
+
+# QTM 220 HW #9
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(cobalt)
+library(rpart)
+library(rpart.plot)
+library(ipw)
+library(broom)
+```
+
+## Exercise #1 Trees Exercise
+
+```{r}
+data(iris)
+head(iris)
+```
+
+### (a) Variable Type
+
+```{r}
+class(iris$Species)
+class(iris$Sepal.Length)
+```
+
+The Species variable is categorical while the Sepal.Length variable is numerical.
+
+### (b) Regression Tree
+
+```{r}
+base_model <- rpart(Sepal.Length ~.,
+      data = iris,
+      method = "anova")
+base_model
+```
+
+Since we are looking at a numerical variable, this is a regression tree.
+
+### (c) Plotting Tree
+
+```{r}
+rpart.plot(base_model)
+```
+
+There are seven leaf nodes. The predicted Sepal.Length for the region with the lowest number of observations is 6.5.
+
+### (d) Prediction w/ Tree
+
+Looking at the regression tree, the predicted sepal length for a new observation with the corresponding characteristics would be 5.2.
+
+## Exercise #2 IPW for Missingness
+
+```{r}
+dogs <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/dogs.missing.csv")
+head(dogs)
+```
+
+### (a) Missing Weight
+
+```{r}
+dogs <- dogs %>%
+  mutate(R = ifelse(is.na(Weight), 0, 1))
+```
+
+```{r}
+## total missing observations
+sum(dogs$R == 0)
+
+## total missing observations by gender
+sum(dogs$R ==0 & dogs$Gender == "Male")
+sum(dogs$R ==0 & dogs$Gender == "Female")
+
+## total missing observations by fixed
+sum(dogs$R ==0 & dogs$Fixed == "Yes")
+sum(dogs$R ==0 & dogs$Fixed == "No")
+```
+
+There are a total of 14 missing observations. There are more missing observations among males than there are among females. Furthermore, the number of missing observations are equal among dogs that were fixed and those that were not fixed.
+
+### (b) Missing Values Among Groups
+
+```{r}
+mean_weight <- mean(dogs$Weight, na.rm = TRUE)
+mean_weight
+
+mean(dogs[dogs$Fixed == "Yes", "Weight"], na.rm = TRUE)
+mean(dogs[dogs$Fixed == "No", "Weight"], na.rm = TRUE)
+```
+
+Since both groups feature the same number of missing values, the estimate should neither be an overestimate or an underestimate when conditioning on whether a dog is fixed or not.
+
+### (c) Propensity Scores
+
+```{r}
+dogs <- dogs %>%
+  mutate(Gender = recode(Gender, "Female" = 0, "Male" = 1)) %>%
+  mutate(Fixed = recode(Fixed, "No" = 0, "Yes" = 1)) %>%
+  mutate(Gender = as.numeric(Gender),
+         Fixed = as.numeric(Fixed))
+```
+
+```{r}
+model <- glm(R ~ Fixed + Gender + Age,
+             family = binomial(link = "logit"),
+             data = dogs)
+
+dogs_ipw <- augment_columns(model, dogs, 
+                            type.predict = "response") %>%
+  rename(propensity = .fitted) %>%
+  mutate(ipw = (R / propensity) + ((1 - R) / (1 - propensity)))
+
+head(dogs_ipw)
+```
+
+```{r}
+ggplot(dogs_ipw[dogs_ipw$Fixed == 1, ], aes(x = propensity)) +
+  geom_histogram(fill = "darkorchid", bins = 30, alpha = 0.7) +
+  labs(title = "Propensity Score Distribution for Fixed Dogs",
+       x = "Propensity Score",
+       y = "Count") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(dogs_ipw[dogs_ipw$Fixed == 0, ], aes(x = propensity)) +
+  geom_histogram(fill = "darkorange", bins = 30, alpha = 0.7) +
+  labs(title = "Propensity Score Distribution for Not Fixed Dogs",
+       x = "Propensity Score",
+       y = "Count") +
+  theme_minimal()
+```
+
+Yes, the propensity score distributions are different among fixed and not fixed dogs. Fixed dogs feature propensity scores above 0.975 while not fixed dogs have propensity scores below 0.86.
+
+```{r}
+summary(dogs_ipw$propensity)
+```
+
+The propensity scores across all groups have a propensity score between 0 and 1.
+
+### (d) Horvitz-Thomson Estimator
+
+```{r}
+dogs_ipw <- dogs_ipw %>%
+  mutate(ipw1 = (R / propensity),
+         ipw0 = (1 - R)/(1 - propensity))
+
+dogs_ipw2 <- dogs_ipw %>%
+  filter(propensity > 0.05 & propensity < 0.95)
+
+ATE <- mean(dogs_ipw2$Weight * dogs_ipw2$ipw1, na.rm = TRUE) - mean(dogs_ipw2$Weight * dogs_ipw2$ipw0, na.rm = TRUE) 
+ATE
+```
+
+```{r}
+mean(dogs_ipw$Weight * dogs_ipw$ipw1, na.rm = TRUE) - mean(dogs_ipw$Weight * dogs_ipw$ipw0, na.rm = TRUE) 
+```
+
+Using the Horvitz-Thompson estimator, the calculated mean should be similar to the mean calculated earlier because both groups feature the same amount of missing values. That said, for some reason, my estimator is not working and it is giving me an NaN value. This could be due to a cleaning error. Alternatively, fixed dogs only feature propensity scores above 0.95, according to the histograms in the previous question. Since this estimator requires removing these values, it will also not be an equitable comparison to the not fixed group.

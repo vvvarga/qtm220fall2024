@@ -1,0 +1,452 @@
+---
+title: "Lab 2: Random Sampling and Sampling distributions"
+author: "F. Nguyen"
+date: " 5 September 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Sampling in R
+
+In this first section, we will discuss how to perform sampling in R, with a focus on sampling from a vector/variable, and sampling from a dataframe.
+
+::: callout-important
+## Important Note!
+
+Throughout the class, we generally assume sampling *with replacement*, if not specified otherwise.
+:::
+
+## Sampling From Distributions
+
+First, we will discuss how to sample from predefined distributions in R, similar to what we did in the examples of the previous lab. In R, in order to randomly sample from a distribution, the function often has the form `rxxx`, with `xxx` corresponds to various distributions. For example, if we want to randomly sample from a Gaussian distribution, the function is `rnorm()`. Here, the full set of arguments is `rnorm(n, mu, sd)`, with `mu` ($\mu$) being the mean and `sd`($\sigma$) being the standard deviation. Let's say we want to draw 1,000 observations from:
+
+$$
+\mathcal{N}(0, 1)
+$$
+
+::: callout-tip
+## Checkout Other Distributions Too!
+
+Check out the **Probability Distribution** of the [R Manuals](https://rstudio.github.io/r-manuals/r-intro/Probability-distributions.html) for more distributions, as well as other functions related to probability distributions in R. You will need this for future exercises.
+:::
+
+We can use `rnorm()` as:
+
+```{r}
+set.seed(42)
+sampled.dat <- rnorm(1000, 0, 1)
+```
+
+Now, we can check the basic descriptive statistics of this sample:
+
+```{r}
+mean(sampled.dat)
+median(sampled.dat)
+sd(sampled.dat)
+mad(sampled.dat)
+```
+
+We can then plot it as a histogram using `geom_histogram()`:
+
+```{r}
+library(tidyverse)
+
+ourplot <- ggplot(data = data.frame(sampled.dat = sampled.dat), aes(x = sampled.dat)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  theme_minimal()
+ourplot
+```
+
+Now, if desire, we can add lines into the plot that indicate mean, median etc. of the sample:
+
+```{r}
+ourplot <- ourplot + 
+  geom_vline(xintercept = mean(sampled.dat), linetype="dotted", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = median(sampled.dat), linetype="dotted", 
+                color = "darkorchid", linewidth=1)
+ourplot
+```
+
+We can also, for example, plot the Interquartile range. Here, we will use the `annotate` function with `rect` shape to create a rectangular shaded area:
+
+```{r}
+ourplot + annotate("rect", 
+                   xmin = quantile(sampled.dat, 0.25), 
+                   xmax = quantile(sampled.dat, 0.75), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) #alpha: transparency
+```
+
+::: callout-note
+## Try it yourself!
+
+Sample 200 observations from a Beta distribution, using `rbeta(200, 6, 2)`, create the histogram of the sample with lines for mean, median, and IQR shaded. The result should look like below:
+:::
+
+```{r}
+# Your code here
+set.seed(42)
+practice.dat <- rbeta(200, 6, 2)
+
+practice.plt <- ggplot(data = data.frame(practice.dat = practice.dat), aes(x = practice.dat)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  theme_minimal() + 
+  geom_vline(xintercept = mean(practice.dat), linetype="dotted", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = median(practice.dat), linetype="dotted", 
+                color = "darkorchid", linewidth=1) + 
+  annotate("rect", 
+                   xmin = quantile(practice.dat, 0.25), 
+                   xmax = quantile(practice.dat, 0.75), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2)
+practice.plt
+```
+
+## Sampling From Data
+
+Next, we will discuss how to sample from data in R, which emulates the real life sampling processes: *with replacement* and *without replacement* sampling. In R, sampling from a set is usually done with the `sample()` function. For example, if we have the set of integers from 1 to 20, and what to sample 10 elements. If we want to sample without replacement, we can:
+
+```{r}
+set.seed(42)
+sample(1:20, 10, replace = F)
+```
+
+Here we can see that the set have 10 unique elements. If we want to sample *with replacement* instead:
+
+```{r}
+set.seed(42)
+sample(1:20, 10, replace = T)
+```
+
+Here, we can see that the number `17` is duplicated, indicating that each time the function sample from the set, it replaces that sampled element. Sampling with replacement is an important assumption normally used for inference in statistics, and is useful for many statistical tests.
+
+Another thing to note is that, with sampling without replacement, we can only sample up the size of the original population:
+
+```{r}
+#| error: true
+set.seed(42)
+sample(1:20, 30, replace = F)
+# The example is attempting to sample more than the size of the population
+```
+
+On the other hand, there is no limit to the size of the sample when we sample with replacement:
+
+```{r}
+set.seed(42)
+X <- sample(1:20, 1000, replace = T)
+hist(X)
+```
+
+If we have a dataframe or a matrix instead of a vector, sampling with `sample()` is a little bit different. Since `sample()` only takes a 1D array as an input, we cannot use the dataframe as input directly. To demonstrate this, let's start loading a population dataset, which we will then sample from. Here, I will use a dataset of all active Airbnb listings in Austin, Texas in July 2024 (courtesy of [Inside Airbnb Project](https://insideairbnb.com/)).
+
+Now, to load the data (you should replace the file path with an appropriate one according to where you downloaded the data to):
+
+```{r}
+airbnb <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/austin_airbnb_july24.csv")
+knitr::kable(head(airbnb))
+```
+
+We can check the length of the dataframe, and the columns:
+
+```{r}
+nrow(airbnb)
+names(airbnb)
+```
+
+Here we see that there are 11,153 listings in the population. Let's see what happens when we use `sample()` directly. Assuming we want to sample 50 listings from this population, without replacement:
+
+```{r}
+#| error: true
+set.seed(42)
+sample(airbnb, 50, replace = F)
+```
+
+We see that the above returns an error, that is because by default R will sample the variables (columns) in the dataframe, instead of the rows. This means the population size here is just 31. We can see this when we use `replace = T`
+
+```{r}
+set.seed(42)
+# we are sampling 50 observations
+sampled <- sample(airbnb, 50, replace = T)
+knitr::kable(head(sampled))
+```
+
+Here, we can see that multiple columns are repeated many times. So, what should we do if we want to sample from a dataframe? We can use `sample()` to create an index instead:
+
+```{r}
+idx <- sample(1:nrow(airbnb), 50, replace = F)
+idx
+sampled <- airbnb[idx,]
+knitr::kable(head(sampled))
+```
+
+And with replacement:
+
+```{r}
+# Let get the idx directly
+sampled <- airbnb[sample(1:nrow(airbnb), 50, replace = T),]
+knitr::kable(head(sampled))
+```
+
+For now, let's focus on one variable. Imagine that you want to know the average price of Airbnb in Austin. However, you do not have access to the full data, so you set out randomly check and note the prices of about 500 listings, with replacement:
+
+```{r}
+sampled.prices <- sample(airbnb$price, 500, replace = T)
+```
+
+Now, let's check the mean and median:
+
+```{r}
+mean(sampled.prices)
+median(sampled.prices)
+```
+
+Here, from the difference we can immediately see that the distribution appear very right skewed. We can use the same code as before to plot it:
+
+```{r}
+ggplot(data = data.frame(sampled.prices = sampled.prices), aes(x = sampled.prices)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(sampled.prices), linetype="dotted", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = median(sampled.prices), linetype="dotted", 
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(sampled.prices, 0.25), 
+                   xmax = quantile(sampled.prices, 0.75), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+This type of distribution is in fact common for monetary related variables such as prices or income etc. This is a log-normal distribution, as we can see by log transformed the sample:
+
+```{r}
+log.prices <- log(sampled.prices)
+ggplot(data = data.frame(log.prices = log.prices), aes(x = log.prices)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(log.prices), linetype="dotted", 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = median(log.prices), linetype="dotted", 
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(log.prices, 0.25), 
+                   xmax = quantile(log.prices, 0.75), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+Now, let's compare the mean of the sample with the actual population mean:
+
+```{r}
+mean(sampled.prices)
+mean(airbnb$price)
+```
+
+Here, we see that the sample mean (the estimate) is quite different from the actual mean (the estimand). In the next section, we will see how the sample mean varies in relation to the actual population mean, by constructing a sampling distribution.
+
+# Sampling Distributions
+
+A sampling distribution is the probability distribution of a given sample statistic, such as sample mean, sample median etc. Imagine if we can randomly sample from the same population for an infinite of times, and calculate the target estimate, then the distribution of the results would be the sampling distribution. In R, for a given population, we can approximate this distribution using **simulation**. The basic steps are:
+
+-   Sample from the population (using `sample()`).
+-   Calculate the target statistics and save them.
+-   Repeat Step 1 and 2 for $n$ times.
+
+Here, for example, let's say we want to estimate the mean price of Airbnb in Austin area, using a random sample of 500 listings. In order to simulate the sampling distribution, we can use the `for` loop:
+
+```{r}
+set.seed(42)
+
+n <- 1000
+x_bar <-  rep(NA, n) #vector of nulls to save results into
+
+for(i in 1:n){
+  sampled.prices <- sample(airbnb$price, 500, replace = T)
+  x_bar[i] <- mean(sampled.prices)
+}
+```
+
+Now the resulting vector contains 1,000 sample means. We can then plot the distribution of it, along with the mean of `x_bar` and the real population mean:
+
+```{r}
+mean(x_bar)
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(airbnb$price), linetype="dotted", #pop mean
+                color = "darkorchid", linewidth=1) +
+  theme_minimal() 
+```
+
+Here, we can see that the mean of the *sampling distribution of the sample mean*, and the *population mean* are almost exactly the same. This tell us that the sample mean is distributed around the population mean. In fact, we can see that this will converge to a Gaussian distribution as the sample size increases (i.e., its *asymptotic distribution* is Gaussian). Additionally, the standard deviation of the sampling distribution would get smaller:
+
+```{r}
+sd(x_bar)
+```
+
+Now, we will increase the sample size to 5,000 instead:
+
+```{r}
+set.seed(42)
+
+
+n <- 1000
+x_bar <-  rep(NA, n) #vector of nulls to save results into
+
+for(i in 1:n){
+  sampled.prices <- sample(airbnb$price, 5000, replace = T)
+  x_bar[i] <- mean(sampled.prices)
+}
+
+sd(x_bar)
+mean(x_bar)
+
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(airbnb$price), linetype="dotted", #pop mean
+                color = "darkorchid", linewidth=1) +
+  theme_minimal() 
+```
+
+Now, as in class, we can also check for the coverage of an arbitrarily chosen interval around a sample mean, i.e. seeing if that interval contains the true population mean. Let's start with \$\bar{x} \pm 15 \$:
+
+```{r}
+mu <- mean(airbnb$price)
+lb <- x_bar - 15
+ub <- x_bar + 15
+
+# Element wise comparison
+mean((mu >= lb) & (mu <= ub))
+```
+
+Or, we can check using the interval around the true mean:
+
+```{r}
+lb <- mu - 15
+ub <- mu + 15
+
+mean((x_bar >= lb) & (x_bar <=  ub))
+```
+
+Both would give us the same coverage of around 74.8%. We can plot this range in the sampling distribution plot. To do this, we need to plot the middle 79.1% of the sampling distribution, which can be achieve by taking the percentile using `quantile()` function, from the (50 - 74.8/2) percentile to (50 + 74.8/2) percentile:
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(airbnb$price), linetype="dotted", #pop mean
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(x_bar, 0.5 - 0.748/2), 
+                   xmax = quantile(x_bar, 0.5 + 0.748/2), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+The range is:
+
+```{r}
+quantile(x_bar, 0.5 - 0.748/2)
+quantile(x_bar, 0.5 + 0.748/2)
+```
+
+This contains the middle 74.8% of the sample means, and we can say that if we using an interval of \$\bar{x} \pm 50 \$, in 79.1% of the samples it will contain the true population mean. Now, on your own, try the same thing for 95% range instead. You should get something like this:
+
+```{r, echo = F}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(airbnb$price), linetype="dotted", #pop mean
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(x_bar, 0.5 - 0.95/2), 
+                   xmax = quantile(x_bar, 0.5 + 0.95/2), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+The width of this range is:
+
+```{r}
+quantile(x_bar, 0.5 - 0.95/2)
+quantile(x_bar, 0.5 + 0.95/2)
+
+as.numeric(quantile(x_bar, 0.5 + 0.95/2) - 
+             quantile(x_bar, 0.5 - 0.95/2))
+```
+
+Since our sampling distribution is roughly symmetric around the true mean, we can approximate it if we know the width. Thus, here, if we use an interval of $\bar{x} \pm 25.5$:
+
+```{r}
+lb <- x_bar - 25.5
+ub <- x_bar + 25.5
+
+# Element wise comparison
+mean((mu >= lb) & (mu <= ub))
+```
+
+We would get a coverage rate (confidence level) of around 95%. That is, we can confidently expect that in 95% of potential samples, of size $n = 5,000$, the interval $\bar{x} \pm 25.5$ would contain the true population mean.
+
+## Replicate()
+
+In R, instead of writing a `for()` loop, we can also use `replicate()` function to repeatedly replicate a function multiple times, and save the results into a vector. This is a wrapper for the `sapply()` function as we discuss in the previous lab. This has the form `replicate(n, function)`, with $n$ being the number of samples, and `function` being a function that returns the desired statistics:
+
+```{r}
+# Sampling
+set.seed(42)
+x_bar <- replicate(1000, mean(sample(airbnb$price, 5000, replace = T)))
+mean(x_bar)
+sd(x_bar)
+
+#Plotting
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(airbnb$price), linetype="dotted", #pop mean
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(x_bar, 0.5 - 0.95/2), 
+                   xmax = quantile(x_bar, 0.5 + 0.95/2), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+::: callout-note
+## Try it yourself!
+
+Replicate the above process, but for median instead of the mean. The result should look like below:
+:::
+
+```{r}
+# Your code here
+set.seed(42)
+# Create a sample of medians
+median.sample <- replicate(1000, median(sample(airbnb$price, 5000, replace = T)))
+mean(median.sample)
+sd(median.sample)
+
+ggplot(data = data.frame(median.sample = median.sample), aes(x = median.sample)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(median.sample), linetype="dashed",  #sample median 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = median(airbnb$price), linetype="dotted", #pop median
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile(median.sample, 0.5 - 0.95/2), 
+                   xmax = quantile(median.sample, 0.5 + 0.95/2), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```

@@ -1,0 +1,300 @@
+---
+title: "Quarto HTML Basics"
+author: "Veronica Vargas"
+date: "`r format(Sys.time(), '%e %B %Y')`"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+## Install
+
+1.  Download and install the latest release of **R** and **RStudio** (Note that these are two different things and you should install both):
+
+    ::: {.callout appearance="minimal"}
+    <i class="bi bi-download"></i> [Download R and RStudio](https://posit.co/download/rstudio-desktop/)
+    :::
+
+    ::: callout-warning
+    ## Note
+
+    If you have already installed R and RStudio from previous classes, make sure your versions are up to date.
+    :::
+
+2.  Next, download and install the latest release of **Quarto**, we will use this for creating the submission document:
+
+    ::: {.callout appearance="minimal"}
+    <i class="bi bi-download"></i> [Download Quarto](https://quarto.org/docs/get-started/)
+    :::
+
+3.  Read through the Quarto tutorials at [Get Started](https://quarto.org/docs/get-started/hello/rstudio.html). You can also use **VSCode** if that is the IDE you are familiar with.
+
+4.  Finally, we will install a few packages necessary for this class. We will use `tidyverse` for plotting, `car` and `lmtest` for regression diagnostics, and `ISLR`, `MASS`, and `AER` for datasets. Open Rstudio, and use `install.packages()` function in R to install them:
+
+    ``` r
+    install.packages("tidyverse")
+    install.packages("car")
+    install.packages("lmtest")
+    install.packages("ISLR")
+    install.packages("MASS")
+    install.packages("AER") 
+    ```
+
+5.  Now, download the `lab0.qmd` file from Canvas and open it.
+
+## Text and Math
+
+Quarto is based on Pandoc and uses its variation of markdown as its underlying document syntax. Pandoc markdown is an extended and slightly revised version of John Gruber's [Markdown](https://daringfireball.net/projects/markdown/) syntax.
+
+Markdown is a plain text format that is designed to be easy to write, and, even more importantly, easy to read:
+
+> A Markdown-formatted document should be publishable as-is, as plain text, without looking like it's been marked up with tags or formatting instructions. -- [John Gruber](https://daringfireball.net/projects/markdown/syntax#philosophy)
+
+Below are some examples of formatting with Pandoc Markdown. See the full documentation of [Quarto's Guide](https://quarto.org/docs/authoring/markdown-basics.html) for more in-depth documentation.
+
+### Text Formatting
+
++-----------------------------------------+-----------------------------------------+
+| Markdown Syntax                         | Output                                  |
++=========================================+=========================================+
+| ``` markdown                            | *italics*, **bold**, ***bold italics*** |
+| *italics*, **bold**, ***bold italics*** |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` markdown                            | superscript^2^ / subscript~2~           |
+| superscript^2^ / subscript~2~           |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` markdown                            | ~~strikethrough~~                       |
+| ~~strikethrough~~                       |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` markdown                            | `verbatim code`                         |
+| `verbatim code`                         |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` markdown                            | -   unordered list                      |
+| * unordered list                        |     -   sub-item 1                      |
+|     + sub-item 1                        |     -   sub-item 2                      |
+|     + sub-item 2                        |         -   sub-sub-item 1              |
+|         - sub-sub-item 1                |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` markdown                            | 1.  ordered list                        |
+| 1. ordered list                         | 2.  item 2                              |
+| 2. item 2                               |     i)  sub-item 1                      |
+|     i) sub-item 1                       |         A.  sub-sub-item 1              |
+|          A.  sub-sub-item 1             |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+
+### Tables
+
+We can manually create tables in Quarto with Markdown as follow:
+
+#### Markdown Syntax
+
+``` markdown
+| Right | Left | Default | Center |
+|------:|:-----|---------|:------:|
+|   12  |  12  |    12   |    12  |
+|  123  |  123 |   123   |   123  |
+|    1  |    1 |     1   |     1  |
+```
+
+#### Output
+
+| Right | Left | Default | Center |
+|------:|:-----|---------|:------:|
+|    12 | 12   | 12      |   12   |
+|   123 | 123  | 123     |  123   |
+|     1 | 1    | 1       |   1    |
+
+Learn more in the article on [Tables](tables.qmd).
+
+### Math
+
+Quarto uses $\LaTeX$ ([Latex Project](https://www.latex-project.org/)) to render mathematical equations. This is the standard way of writing math in academia and elsewhere. You can either display the math *inline*, i.e. within normal text, using a pair of dollar signs `$`. For example, this code:
+
+```         
+The data consists of $n$ observations $\{x_i, y_i\}^n_{y=1}$
+```
+
+Will show up as:
+
+"The data consists of $n$ observations $\{x_i, y_i\}^n_{y=1}$."
+
+Or, you can have *display equations*, which are on separate lines, using double dollar signs `$$`:
+
+```         
+$$
+y_i = \beta_0 + \beta_1 x_i + \varepsilon_i
+$$
+```
+
+Will show up as:
+
+$$
+y_i = \beta_0 + \beta_1 x_i + \varepsilon_i
+$$ Preferably, you will use $\LaTeX$ to write the equations in answers to your non-programming questions and submit everything in same file. Below are some example latex scripts and their outputs. Refer to [this cheatsheet](https://tug.ctan.org/info/undergradmath/undergradmath.pdf) for more examples.
+
++-----------------------------------------+-----------------------------------------+
+| $\LaTeX$ Syntax                         | Output                                  |
++=========================================+=========================================+
+| ``` latex                               | $$                                      |
+| $$                                      | \frac{1}{2}                             |
+| \frac{1}{2}                             | $$                                      |
+| $$                                      |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` latex                               | $$                                      |
+| $$                                      | Y = X_1 + X_2                           |
+| Y = X_1 + X_2                           | $$                                      |
+| $$                                      |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` latex                               | $$                                      |
+| $$                                      | a^2 + b^2 = c^2                         |
+| a^2 + b^2 = c^2                         | $$                                      |
+| $$                                      |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` latex                               | $$                                      |
+| $$                                      | \mathbf{(X^{\prime}X)^{-1}X^{\prime}y}  |
+| \mathbf{(X^{\prime}X)^{-1}X^{\prime}y}  | $$                                      |
+| $$                                      |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` latex                               | $$                                      |
+| $$                                      | Y \sim X\beta_0 + X\beta_1 + \epsilon\\ |
+| Y \sim X\beta_0 + X\beta_1 + \epsilon\\ | \epsilon \sim N(0,\sigma^2)             |
+| \epsilon \sim N(0,\sigma^2)             |  $$                                     |
+| $$                                      |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` latex                               | $$x =  \begin{cases}                    |
+| $$x = \begin{cases}                     | 1 \;\;\text{ if } \mu > 0\\             |
+| 1 \;\;\text{ if } \mu > 0\\             | 0 \;\;\text{ otherwise }                |
+| 0 \;\;\text{ otherwise }                | \end{cases}$$                           |
+| \end{cases}$$                           |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+| ``` latex                               | $$\begin{bmatrix}                       |
+| $$\begin{bmatrix}                       | 1 & 2 & 3\\                             |
+| 1 & 2 & 3\\                             | a & b & c                               |
+| a & b & c                               | \end{bmatrix}$$                         |
+| \end{bmatrix}$$                         |                                         |
+| ```                                     |                                         |
++-----------------------------------------+-----------------------------------------+
+
+## Computation
+
+In this section, we will look at basic computation and results presentation in R and Quarto. Let's use the `Credit` dataset from the **ISLR** package for our example.
+
+```{r}
+#| label: load-packages
+library(ISLR)
+library(ggplot2)
+```
+
+First, we can look at the data.
+
+```{r}
+head(Credit)
+```
+
+We can use the `knitr::kable()` function to print tables as HTML, for better looking tables:
+
+```{r}
+knitr::kable(head(Credit))
+```
+
+Then, we can summarize the dataset:
+
+```{r}
+summary(Credit)
+```
+
+As we can see, the output are printed out once we render the document.
+
+Now, let's visualize the relationship between Credit rating (`Rating`), and Income in 1000s (`Income`), by gender (`Gender`), using `ggplot()` and `geom_point()`:
+
+```{r}
+#| label: scatterplot
+
+ggplot(Credit, aes(x = Rating, y = Income, col = Gender)) +
+  geom_point(alpha = 0.5, size = 2) +
+  theme_minimal()
+```
+
+If we just want to embed the plot (or any other types of output), we can add `#| code-fold: true` to the code block to hide the code:
+
+```{r}
+#| label: scatterplot_folded
+#| code-fold: true
+
+ggplot(Credit, aes(x = Rating, y = Income, col = Gender)) +
+  geom_point(alpha = 0.5, size = 2) +
+  theme_minimal()
+```
+
+Quarto can also display interactive plots. For example, we can use `plotly` package to make this interactive:
+
+```{r}
+#| label: scatterplot_ly
+
+library(plotly)
+p <- ggplot(Credit, aes(x = Rating, y = Income, col = Gender)) +
+  geom_point(alpha = 0.5, size = 2) +
+  theme_minimal()
+ggplotly(p)
+```
+
+Now, to get a taste of what you will learn in the class, let's go ahead and estimate a regression model of Credit rating (`Rating`) on income (`Income`) and gender (`Gender`), and display the results, with `lm()`. Don't worry about interpreting the output right now!
+
+```{r}
+ols <- lm(Rating ~ Income  + Gender, Credit)
+summary(ols)
+```
+
+The above is a typical output of a liner regression model. You will see a lot of these this semester.
+
+## Your Turn
+
+Now, to make sure you have properly installed R, RStudio, and Quarto, let's answer a few quick questions:
+
+1.  Create an R code block below this line, and type in `version`.
+
+    ```{r}
+    `version`
+    ```
+
+2.  Write down the formula for variance of a random variable ([See here](https://en.wikipedia.org/wiki/Variance) if you forget) in $\LaTeX$ below this line.
+
+    $$
+    Var[X] = E[(X-\mu)^2]
+    $$
+
+3.  Use `ggplot` to create a scatterplot of credit limit (`Limit`), age (`Age`), and colored by ethnicity (`Ethnicity`). Embed the plot below this line, fold the code.
+
+    ```{r}
+    #| code-fold: true
+
+    ggplot(Credit, aes(x = Age, y = Limit, col = Ethnicity)) +
+      geom_point(alpha = 0.5, size = 2) +
+      theme_minimal()
+    ```
+
+4.  Once you are done with the above, change `Author:` field at the beginning of the document to your name, click `Render` button at the top, and submit the HTML file to Canvas.
+
+::: callout-note
+## Note
+
+The HTML file will be in the same folder as the `lab0.qmd` file.
+:::

@@ -1,0 +1,380 @@
+---
+title: "QTM 220 HW #3"
+author: "Veronica Vargas"
+format: html
+editor: visual
+---
+
+# Exercise #1
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+pokemon.sample <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/Pokemon.Sample.csv")
+
+head(pokemon.sample)
+summary(pokemon.sample)
+```
+
+## New Estimator
+
+### (c) Bootstrap Estimated Sampling Distribution
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n){
+  sampled.hp <- sample(pokemon.sample$hp, length(pokemon.sample$hp), replace = T)
+  x_bar[i] <- mean(sampled.hp)
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mean(x_bar) + (1.96 * sd(x_bar)), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + # plus 1.96 stdev
+    geom_vline(xintercept = mean(x_bar) - (1.96 * sd(x_bar)), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + # minus 1.96 stdev
+  theme_minimal()
+```
+
+```{r}
+lower.bound <- mean(x_bar) - (1.96 * sd(x_bar))
+upper.bound <- mean(x_bar) + (1.96 * sd(x_bar))
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (d) Population Estimated Sampling Distribution
+
+If we had the population, we could calculate the true sampling distribution of the estimator on the population. We would not know whether the expected value of the estimator would be equal to the estimand in the population.
+
+# Exercise #2
+
+## New Estimator
+
+### (c) Bootstrap Estimated Sampling Distribution
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n){
+  sampled.hp <- sample(pokemon.sample$hp, length(pokemon.sample$hp), replace = T)
+  x_bar[i] <- (1/(length(sampled.hp) - 2)) * sum(sampled.hp)
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(x_bar, 0.025), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + # plus 1.96 stdev
+    geom_vline(xintercept = quantile(x_bar, 0.975), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + # minus 1.96 stdev
+  theme_minimal()
+```
+
+```{r}
+lower.bound <- quantile(x_bar, 0.025)
+upper.bound <- quantile(x_bar, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (d) Comparing Estimator w/ Population
+
+If I had the population and could plot the sampling distribution of my estimator it would still likely contain the estimand if I were to repeat the procedure. That said, since the interval is skewed, the bias from the estimator would reduce the likelihood in which the estimand would be found using our estimator.
+
+# Exercise #3
+
+## A Bimodal Situation
+
+```{r}
+population <- c(rnorm(n = 1000, mean = 1, sd = 2), rnorm(n = 1000, mean = 10, sd = 2))
+```
+
+### (a) Population Mean & Histogram
+
+```{r}
+mean(population)
+hist(population)
+```
+
+### (b) Generating Samples w/ Histogram
+
+```{r}
+sample1 <- sample(population[population <1], 50, replace = T )
+sample2 <- sample(population[population > 10], 50, replace = T)
+
+hist(sample1)
+hist(sample2)
+```
+
+Both of these histograms are unimodal, unlike the bimodal histogram in part (a). This is not the usual way we sample.
+
+### (c) Population Sampling Distribution
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n){
+  sample <- sample(population, 50, replace = T)
+  x_bar[i] <- mean(sample)
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(x_bar, 0.025), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + 
+    geom_vline(xintercept = quantile(x_bar, 0.975), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + 
+  theme_minimal()
+```
+
+```{r}
+lower.bound <- quantile(x_bar, 0.025)
+upper.bound <- quantile(x_bar, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (d) Sample #1 Sampling Distribution
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n){
+  sample <- sample(sample1, 50, replace = T)
+  x_bar[i] <- mean(sample)
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(x_bar, 0.025), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + 
+    geom_vline(xintercept = quantile(x_bar, 0.975), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + 
+  theme_minimal()
+```
+
+```{r}
+lower.bound <- quantile(x_bar, 0.025)
+upper.bound <- quantile(x_bar, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (e) Sample #2 Sampling Distribution
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n){
+  sample <- sample(sample2, 50, replace = T)
+  x_bar[i] <- mean(sample)
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(x_bar, 0.025), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + 
+    geom_vline(xintercept = quantile(x_bar, 0.975), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + 
+  theme_minimal()
+```
+
+```{r}
+lower.bound <- quantile(x_bar, 0.025)
+upper.bound <- quantile(x_bar, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (f) Comparing Histograms
+
+Only the histogram in part (c) is centered with respect to the population mean. This is because it is taking samples from the population, whereas the other histograms are taking from the biased samples.
+
+# Exercise #4
+
+## Difference in Means
+
+```{r}
+chihuahua.sample <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/Chihuahua.Sample.csv")
+
+head(chihuahua.sample)
+summary(chihuahua.sample)
+```
+
+### (a) Calculating Difference in Mean Weight
+
+```{r}
+mean_female <- mean(chihuahua.sample$weight[chihuahua.sample$sex == "female"])
+mean_male <- mean(chihuahua.sample$weight[chihuahua.sample$sex == "male"])
+
+mean_diff <- mean_male - mean_female
+mean_diff
+
+table(chihuahua.sample$sex)
+```
+
+### (b) Creating 95% CI
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n) {
+  sample <- chihuahua.sample[sample(nrow(chihuahua.sample), nrow(chihuahua.sample), replace = TRUE), ]
+  
+  mean_female <- mean(sample$weight[sample$sex == "female"])
+  mean_male <- mean(sample$weight[sample$sex == "male"])
+  
+  x_bar[i] <- mean_male - mean_female
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(x_bar, 0.025), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + 
+    geom_vline(xintercept = quantile(x_bar, 0.975), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + 
+  theme_minimal()
+```
+
+```{r}
+lower.bound <- quantile(x_bar, 0.025)
+upper.bound <- quantile(x_bar, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+### (c) Repeating w/ Alternative Sample
+
+```{r}
+chihuahua.sample.alt <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/Alternate.Chihuahua.sample.csv")
+
+head(chihuahua.sample.alt)
+summary(chihuahua.sample.alt)
+```
+
+```{r}
+mean_female <- mean(chihuahua.sample.alt$weight[chihuahua.sample.alt$sex == "female"])
+mean_male <- mean(chihuahua.sample.alt$weight[chihuahua.sample.alt$sex == "male"])
+
+mean_diff <- mean_male - mean_female
+mean_diff
+
+table(chihuahua.sample.alt$sex)
+```
+
+```{r}
+set.seed(42)
+
+n <- 10000
+x_bar <-  rep(NA, n) 
+
+for(i in 1:n) {
+  sample <- chihuahua.sample.alt[sample(nrow(chihuahua.sample.alt), nrow(chihuahua.sample.alt), replace = TRUE), ]
+  
+  mean_female <- mean(sample$weight[sample$sex == "female"])
+  mean_male <- mean(sample$weight[sample$sex == "male"])
+  
+  x_bar[i] <- mean_male - mean_female
+}
+```
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(x_bar, 0.025), linetype = 'dotted',
+                color = "darkorchid", linewidth = 1) + 
+    geom_vline(xintercept = quantile(x_bar, 0.975), linetype = "dotted", 
+                color = "darkorchid", linewidth=1) + 
+  theme_minimal()
+```
+
+```{r}
+lower.bound <- quantile(x_bar, 0.025)
+upper.bound <- quantile(x_bar, 0.975)
+
+print(paste0("The Bootstrapped 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+Comparing the original sample to the alternative sample, the mean of the original sample is larger than that of the alternative sample. Furthermore, the original sample features an almost balanced set between males and females whereas the alternative sample is majority female. Finally, the 95% CI is slightly smaller in the original sample and the interval is skewed to the right in the alternative sample. This is likely because there is more weight being placed on females, resulting in higher values for the difference in means estimator.
+
+# Exercise #5
+
+## Two Estimators
+
+### (d) Plotting Variance #1 vs. Sample Size
+
+```{r}
+theta <- 0.5  
+n_values <- 30:100
+
+var_theta_hat <- theta/n_values 
+
+plot(n_values, var_theta_hat, type = "b", col = "blue", 
+     xlab = "Sample Size (n)", ylab = "Variance of θ̂",
+     main = "Variance of θ̂ v.s Sample Size (θ = 0.5)",
+     lwd = 2)
+grid()
+```
+
+### (g) Plotting Variance #2 vs. Sample Size
+
+```{r}
+theta <- 0.5  
+n_values <- 30:100
+
+var_theta_hat <- rep(0.5, length(n_values)) 
+
+plot(n_values, var_theta_hat, type = "l", col = "blue", 
+     xlab = "Sample Size (n)", ylab = "Variance of θ̂",
+     main = "Variance of θ̂ = X_i v.s Sample Size (θ = 0.5)",
+     lwd = 2)
+abline(h = 0.5, col = "red", lty = 2)  
+grid()
+```

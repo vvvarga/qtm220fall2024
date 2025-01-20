@@ -1,0 +1,624 @@
+---
+title: "Lab 1"
+author: "F. Nguyen"
+date: "30 Aug 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Basic Summary Statistics in R:
+
+## Measures of Location (Center)
+
+### Mean
+
+Mean is the most common summary statistics for a population or a sample. Population mean and sample mean shares the same formula, namely:
+
+$$
+\mu = \frac{\sum_{i=1}^{N}x_i}{N}
+$$
+
+::: callout-important
+## Important Note!
+
+The fact that the formula is the same for population and sample **is only true for mean**, not variance or median or other summary statistics.
+:::
+
+In which $x_i$ is a specific observation, and $N$ is the population size. You will see that in statistics literature, population mean is often denoted as $\mu$, and sample mean is often denoted as $\bar{x}$. We can first try to calculate this using basic algebra in R. Let's calculate the average of the following set:
+
+$$
+\mathcal{X} = \{3, 5, 10, 12, 4, 6, 9\}
+$$
+
+First, we can just type everything in manually:
+
+```{r}
+(3 + 5 + 10 + 12 + 4 + 6 + 9)/7
+```
+
+This is of course too rudimentary, normally we want to save the set to a *vector* to use later. We can then use `sum(X)` to get $\sum_{i=1}^{N}x_i$, `length(X)` to get $N$:
+
+```{r}
+X <- c(3, 5, 10, 12, 4, 6, 9)
+sum(X)/length(X)
+```
+
+Finally, we can use the `mean(X)` function to get the mean of the vector $\mathcal{X}$ directly:
+
+```{r}
+mean(X)
+```
+
+It's instructive to remember, however, while population mean and sample mean have the same formula, they usually do not have the same values, unless your sample contains the whole population. For example, let's draw 1,000 observations from the distribution
+
+$$
+x_i \sim \mathcal{N}\left(0, 2\right)
+$$
+
+That is, a normal distribution with mean 0 and variance 2. We can use `rnorm()` function to do this:
+
+```{r}
+#set seed for reproducible results
+#this is any time we're doing a random experiment
+set.seed(42)
+#rnorm() takes mean and SD instead of variance
+X <- rnorm(1000, 0, sqrt(2))
+```
+
+::: callout-tip
+## Checkout Other Distributions Too!
+
+Check out the **Probability Distribution** of the [R Manuals](https://rstudio.github.io/r-manuals/r-intro/Probability-distributions.html) for more distributions, as well as other functions related to probability distributions in R. You will need this for future exercises.
+:::
+
+Now, we know that here the population mean is $\mu_x = 0$. Let's check the sample mean:
+
+```{r}
+mean(X)
+```
+
+We see that there is a slight different between sample mean and population mean. We will discuss convergence properties of sample mean later, but the gist of it is as the sample size increase, the sample mean distribution gets closer to the population mean.
+
+```{r}
+set.seed(42)
+mean(rnorm(10, 0, sqrt(2)))
+mean(rnorm(1000, 0, sqrt(2)))
+mean(rnorm(100000, 0, sqrt(2)))
+```
+
+### Median
+
+The **median** is the middle value of an ordered set. In the case of an even number of elements in a set, and thus no exact middle, it is the average of the middle two elements.
+
+Let's revisit the previous set:
+
+$$
+\mathcal{X} = \{3, 5, 10, 12, 4, 6, 9\}
+$$
+
+Here, we can reorder the set as:
+
+$$
+\mathcal{X} = \{3, 4, 5, 6, 9,  10, 12\}
+$$
+
+We can easily see that the middle element is the fourth one, i.e. 6. So how do we do this using code? Let's program the steps we have done:
+
+First, we sort the input set:
+
+```{r}
+X <- c(3, 5, 10, 12, 4, 6, 9)
+X <- sort(X)
+X
+```
+
+We see that X is now sorted. We can then get the size $n$ of X, and then conditional on whether $n$ is odd or even, we get $x_{\frac{n + 1}{2}}$ or $\frac{1}{2}(x_{\frac{n}{2}} + x_{\frac{n}{2} + 1})$. Here, we may use `ifelse()` function to perform the conditional:
+
+```{r}
+n <- length(X)
+
+median <- ifelse(n %% 2 == 0, # if n is diviisble by 2
+                 (X[n/2] + X[n/2 + 1])/2,  #mean of two middle elements
+                 X[(n + 1)/2]) # else, middle elements
+
+median
+```
+
+We can combine everything into a function as:
+
+```{r}
+custom.median <- function(X){
+  X <- sort(X)
+  n <- length(X)
+  med<- ifelse(n %% 2 == 0, # if n is diviisble by 2
+                 (X[n/2] + X[n/2 + 1])/2,  #mean of two middle elements
+                 X[(n + 1)/2]) # else, middle elements
+  med
+}
+
+# Odd set
+X <- c(3, 5, 10, 12, 4, 6, 9)
+custom.median(X)
+
+# Even set
+X <- c(3, 5, 10, 12, 4, 6, 9, 1)
+custom.median(X)
+```
+
+Similar to the previous section, R also offers a built in function, `median()`, to get the median of a set.
+
+```{r}
+X <- c(3, 5, 10, 12, 4, 6, 9)
+median(X)
+
+# Even set
+X <- c(3, 5, 10, 12, 4, 6, 9, 1)
+median(X)
+```
+
+### Mode
+
+The final common measure of location is **mode**, which is the most frequently occur value(s) in a set. For example, consider this set:
+
+$$
+\mathcal{X} = \{5, 5, 10, 12, 4, 6, 9\}
+$$ Here, 5 occurs twice while other values only occur once, so 5 is the mode. There can be more than one modes. For example:
+
+$$
+\mathcal{X} = \{5, 5, 10, 12, 4, 4, 9\}
+$$ Here, both 5 and 4 occur two times, thus both are the modes.
+
+::: callout-important
+## Important Note!
+
+There exist distributions with infinite number of modes, such as uniform continuous distribution. In these cases, mode is not a particular useful measure.
+:::
+
+So how do we calculate mode in R? The necessary steps are:
+
+-   First, create frequency table of the unique values of the set.
+
+-   Next, get the highest frequency.
+
+-   Return the values with that frequency.
+
+We do this in R as follow:
+
+```{r}
+custom.mode <- function(x) {
+  # Get unique values of the set
+  unique_x <- unique(x)
+  # use tabulate to get the frequencies table
+  freq <- tabulate(match(x, unique_x))
+  # Identify the mode(s) with max(freq)
+  modes <- unique_x[freq == max(freq)]
+  # Return modes
+  return(modes)
+}
+
+# unimodal
+X <- c(5, 5, 10, 12, 4, 6, 9)
+custom.mode(X)
+# bimodal
+X <- c(5, 5, 10, 12, 4, 4, 9)
+custom.mode(X)
+# Non numeric
+X <- c("GA","AL","CA","NY","GA","WI","IL","MN","OH")
+custom.mode(X)
+
+```
+
+## Measures of Spread
+
+### Variance and Standard Deviation
+
+Next, another pivotal summary statistic is the **variance**, and its square root, the **standard deviation**. Here, we have two different formulae for the population case and the sample case.
+
+First, we start with the population case. The population variance is defined as:
+
+$$
+\sigma^2 = \frac{1}{N}\sum_{i = 1}^N \left(x_i - \mu \right)^2
+$$
+
+This can also be written as:
+
+$$
+\sigma^2 =  \left(\frac{1}{N}\sum_{i = 1}^N x_i^2\right) - \mu^2
+$$
+
+The standard deviation $\sigma$ is then just a simple matter of taking the square root of $\sigma^2$. Let's test this manually with the same population set we used before:
+
+$$
+\mathcal{X} = \{3, 5, 10, 12, 4, 6, 9\}
+$$
+
+First, we try the first formula
+
+```{r}
+sigma2 <- ((3 - 7)^2 + (5 - 7)^2 + (10 - 7)^2 +
+            (12 - 7)^2 + (4 - 7)^2 + (6 - 7)^2 +
+            (9 - 7)^2)/7
+sigma2
+```
+
+The second:
+
+```{r}
+sigma2 <- (3^2 + 5^2 + 10^2 + 12^2 + 4^2 + 6^2 + 9^2)/7 - 7^2
+sigma2
+```
+
+Those are of course too cumbersome, we can instead apply the formula to the vector form:
+
+```{r}
+X <- c(3, 5, 10, 12, 4, 6, 9)
+sigma2 <- mean((X - mean(X))^2)
+sigma2
+```
+
+Here the function is simple so we can apply it directly, but generally some variation of `apply()` function is preferred. Here, for example, we can use `sapply()`:
+
+```{r}
+sigma2 <- mean(sapply(X, function(x) (x - mean(X))^2))
+sigma2
+```
+
+We can then get the standard deviation:
+
+```{r}
+sqrt(sigma2)
+```
+
+Now, you maybe thinking that there should be a way in base R to get the population variance with one function, like we did with `mean()`. **This is not the case**, as mentioned above. The variance and standard deviation functions in R (`var()` and `sd()`) are **for sample case** only. However, we can define our own custom function for population variance:
+
+```{r}
+# Define pop.var(X)
+# Input: vector X
+# Output: population variance
+pop.var <- function(X){
+  sigma2 <- mean((X - mean(X))^2)
+  return(sigma2)
+}
+```
+
+::: callout-note
+## On your own time
+
+Try implementing the function above, or the previous vector calculations, using the second form instead of the first form!
+:::
+
+Let's test this:
+
+```{r}
+# var
+pop.var(X)
+# sd
+sqrt(pop.var(X))
+```
+
+We can compare this with the built in sample variance and standard error functions in R:
+
+```{r}
+#these built-in functions should only be used for samples
+#not full population data
+# var
+var(X)
+# sd
+sd(X)
+```
+
+Here, we can see how using these built in functions, which are for *estimating from samples*, can be misleading when we have the full population data. You will learn more about this in next classes and lab, but for now, these functions are only useful if we have i.i.d *samples* such as this:
+
+```{r}
+set.seed(42)
+X <- rnorm(100, 0, sqrt(2))
+# var
+var(X)
+# sd
+sd(X)
+```
+
+### Median Absolute Deviation (MAD)
+
+We can interpret the standard deviation as a measure of the amount of variation of the values of a variable around its mean. What about the median? In that case, we have the corresponding variability measure of **Median Absolute Deviation (MAD)**. This is defined as:
+
+$$
+MAD = Median(|X - Median(X)|)
+$$
+
+Namely, it is the median of the absolute difference between an element in the distribution and the median of said distribution.
+
+::: callout-tip
+## MAD and Standard Deviation
+
+MAD can be used as an estimator for standard deviation, using the formula:
+
+$$
+\widehat{\sigma} = k \cdot MAD
+$$
+
+For Gaussian (normal) distribution, $k \approx 1.4826$.
+:::
+
+For example, using the previous set, we have:
+
+$$
+\mathcal{X} = \{3, 5, 10, 12, 4, 6, 9\}
+$$
+
+The median here as we shown is 6, so the absolute differences set is:
+
+$$
+\mathcal{D} = \{3, 1, 4, 6, 2, 0, 3\}
+$$
+
+Reorder this as:
+
+$$
+\mathcal{D} = \{0, 1, 2, 3, 3, 4, 6\}
+$$
+
+We see that the MAD is 3. Now, we can do this in R using the median function, either the built in or the custom one we programmed above:
+
+```{r}
+median.AD <- function(X){
+  D <- abs(X - median(X))
+  median(D)
+}
+X <- c(3, 5, 10, 12, 4, 6, 9)
+median.AD(X)
+```
+
+We can also test with a random sample:
+
+```{r}
+set.seed(42)
+X <- rnorm(10000, 0, 2)
+median.AD(X)
+```
+
+In R, we also have a built in function called `mad()` for this. However, we have to set `constant = 1`:
+
+```{r}
+mad(X, constant = 1)
+```
+
+This is because, by default, this function use an adjustment constant of 1.4826, so it actually returns the approximation of standard deviation from MAD.
+
+```{r}
+mad(X)
+sd(X)
+```
+
+::: callout-tip
+## Another MAD!
+
+In the same vein as Median Absolute Deviation, there exists another measure of spread around the mean called Mean Absolute Deviation, which frustratingly is also often denoted as MAD. This is defined as:
+
+$$
+MAD = \frac{1}{n} \left( X - \bar{X} \right)
+$$
+
+I.e, the mean of the absolute differences between the elements in a distribution and the mean of that distribution. This is more robust to outliers than standard deviation and variance, but is less popular due to other nice properties of variance.
+:::
+
+### Range and quantiles
+
+Other than center and variation, we may want to describe the range of a distribution or a set. The most common ones are min `min()`, max `max()`, and `quantile()`, which returns any quantiles of a sampling distribution. We will demonstrate these summary statistics with both small discrete sets and randomly drawn sets. First, we start with the discrete set of 9 elements:
+
+```{r}
+X <- c(3, 5, 10, 12, 4, 6, 9, 21, 1)
+min(X)
+max(X)
+quantile(X)
+```
+
+Now, the min and max are straightforward to interpret. However, how do we interpret the quantiles? Here we see that the percentiles represent the relative ordering of the elements. For example, the 25th percentile is 4 means that 4 is larger than $25\%$ of the set, which here is 1 and 3. We can also see that the $50\%$ percentile is always the median, and the $0\%$ and $100\%$ are the min and max elements respectively. It is probably easier to see the usefulness of `quantile()` with a more continuous sample:
+
+```{r}
+set.seed(42)
+X <- rnorm(10000, 0, 2)
+min(X)
+max(X)
+# Range of X
+max(X) - min(X)
+quantile(X)
+```
+
+We can see from the quantiles that the distribution of X seems symmetric, which is the case for samples drawn from a normal distribution. We can even get more granular information:
+
+```{r}
+quantile(X, probs = seq(0, 1, 0.1))
+```
+
+We can also get a specific percentile:
+
+```{r}
+quantile(X, probs = c(0.975))
+```
+
+If you are familiar with normal (Gaussian) distribution, this 97.5th percentile should be familiar. Let's compare it with:
+
+```{r}
+0 + 1.96*2
+```
+
+::: callout-note
+## On your own time
+
+Get the 2.5th percentile and compare it with $\mu - 1.96*\sigma$.
+:::
+
+Using **min** and **max** for the range of the distribution are sometime susceptible to extreme outlier. In these cases, we may want to use a measure of spread called **Interquartile Range** (IQR), which is the difference between the 75th and 25th percentiles of the data. This tends to eliminate the effect of outliers. For example:
+
+```{r}
+set.seed(42)
+X <- rnorm(10000, 0, 2)
+#Add outliers
+X <- c (X, rnorm(20, 0, 200))
+
+# Range
+min(X)
+max(X)
+max(X) - min(X) # Range of X
+
+#IQR
+quantile(X, probs = c(0.25))
+quantile(X, probs = c(0.75))
+
+as.numeric(quantile(X, probs = c(0.75)) - 
+             quantile(X, probs = c(0.25)))
+```
+
+## Shape
+
+### Skewness
+
+Finally, we can also summarize a distribution using statistics that describe its overall shape (instead of raw values like above). The two main statistics for this are *skewness* and *kurtosis*. **Skewness** measures the asymmetry of the distribution. If the skewness is negative, we call a distribution *left-skewed* (mean smaller than median), and if a distribution is positive, we call a distribution *right-skewed* (mean greater than median). Its formula is derived from the third standardized moment of a distribution:
+
+$$
+\gamma = \mathbb{E} \left[\left( \frac{X - \mu}{\sigma}\right)^3\right]
+$$
+
+### Tailness
+
+Meanwhile, **Kurtosis** is the fourth standardized moment, and quantifies the relative tail length of a distribution in comparison to a normal distribution, i.e the *tail extremity* of a distribution (how likely is it to produce outliers). In common statistics software, a normal distribution has a kurtosis of 3, and anything less is short tailed, while anything higher is long tailed.
+
+$$
+\theta = \mathbb{E} \left[\left( \frac{X - \mu}{\sigma}\right)^4\right]
+$$
+
+### Examples
+
+We can use some non standard distributions to demonstrate these statistics.
+
+```{r}
+set.seed(42)
+X1 <- rbeta(1000,6,1.5)
+hist(X1)
+```
+
+```{r}
+library(moments)
+mean(X1) - median(X1)
+skewness(X1)
+kurtosis(X1)
+```
+
+```{r}
+set.seed(42)
+X2 <-  rbeta(1000,2.5,4)
+hist(X2)
+```
+
+```{r}
+mean(X2) - median(X2)
+skewness(X2)
+kurtosis(X2)
+#measure of the tailedness of a distribution
+```
+
+We can see that the statistics correspond with what we observe in the histograms, with X1 being left skewed and X2 is slightly right skewed, and X1 has much longer tails than X2.
+
+# Real Data and Visualization
+
+## Loading Data
+
+In order to demonstrate the previously discussed summary statistics with real data, let's use the `Medicaid1986` dataset in the `AER` package. This dataset is cross-section data originating from the 1986 Medicaid Consumer Survey. The data comprise two groups of Medicaid eligibles at two sites in California (Santa Barbara and Ventura counties): a group enrolled in a managed care demonstration program and a fee-for-service comparison group of non-enrollees.
+
+```{r}
+library(AER)
+data("Medicaid1986")
+knitr::kable(head(Medicaid1986))
+
+```
+
+## Summarize
+
+Let's use `summary()` function to summarize the full dataset:
+
+```{r}
+summary(Medicaid1986)
+```
+
+Now, for this example, we will focus on `visits`, the number of doctor visits of each individual. Let's plot a histogram of this variable:
+
+```{r}
+library(tidyverse)
+ggplot(Medicaid1986, aes(x=visits)) +
+  geom_histogram(position="identity", fill = "steelblue") + theme_minimal() +
+  ggtitle("Distribution of Doctor Visits")
+```
+
+Now, let's get the mean and standard deviation of this variable:
+
+```{r}
+mean(Medicaid1986$visits)
+sd(Medicaid1986$visits)
+```
+
+::: callout-important
+## Note
+
+Since the data is from a survey, we assume it is a sample and not a full population. Think carefully whether it is the same case for your homework assignment! If it is population data, we should use the custom made function for population variance and standard deviation as in previous section instead.
+:::
+
+How do we interpret the mean number here? This simply means that: *The individuals in the sample have around 1.93 doctor visits on average*. Let's look at the median and MAD:
+
+```{r}
+median(Medicaid1986$visits)
+mean(Medicaid1986$visits) > median(Medicaid1986$visits)
+#review when mean is larger than median etc.
+mad(Medicaid1986$visits, constant = 1)
+```
+
+We see here that the mean is greater on the median, and this corresponds to what we see in the plot, which is a right skewed distribution. We can confirm this with skewness measure:
+
+```{r}
+skewness(Medicaid1986$visits)
+kurtosis(Medicaid1986$visits)
+```
+
+The large positive skewness confirms the right skewed distribution, and the large kurtosis tells us that outliers are common, which is another fact we can see from the plot.
+
+We can also see the most common number of visits in the data using mode:
+
+```{r}
+custom.mode(Medicaid1986$visits)
+```
+
+So 0 is the most common value of visits amongst patients in the data.
+
+## Bimodal Data
+
+We should note that mode is not always close to mean and median. For example, let's look at age:
+
+```{r}
+ggplot(Medicaid1986, aes(x=age)) +
+  geom_histogram(position="identity", fill = "steelblue") + theme_minimal() +
+  ggtitle("Distribution of Age")
+```
+
+This is a bimodal distribution. We have its statistics as:
+
+```{r}
+# mean
+mean(Medicaid1986$age)
+# sd
+sd(Medicaid1986$age)
+# median
+median(Medicaid1986$age)
+# MAD
+mad(Medicaid1986$age)
+# mode
+custom.mode(Medicaid1986$age)
+```
+
+Here, we see that even though the mean and median of the data are older, the mode is actually very young at 24. This happens frequently in multimodal distributions!

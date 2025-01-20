@@ -1,0 +1,548 @@
+---
+title: "Lab 12"
+author: "F. Nguyen"
+date: " 5 Dec 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Covariates Balancing Test
+
+The idea of **covariate balance** is at the core of causal inference. Intuitively, when estimating the effect of a treatment, we want to compare "like with like": if two groups are similar in every respect, *except in assignment to treatment*, then we can attribute differences in outcomes to the treatment itself, as opposed to other confounding factors (*Cochran, 1965*).
+
+However, unless in a fully randomized trial with very large sample, any two groups will differ in some respect, so we have to account for this in order to identify the true treatment effect. Today, we will discuss some basic ways to do this, with regression, matching, propensity score matching, and inverted probability weighting. But first, we start with testing covariates balance.
+
+Here, let's use the data from [Bauer (2015)](https://academic.oup.com/esr/article-abstract/31/4/397/494055?redirectedFrom=fulltext&login=false). This paper studies the causal effect of victimization on social trust:
+
+-   `trust`: Generalized trust (0-10) (Outcome Y)
+
+-   `threat`: Experiencing a threat (0,1) in the year before (Treatment variable D)
+
+-   `age` : Age
+
+-   `male`: Sex (Male = 1, Female = 0)
+
+-   `education`: Level of education (0-10)
+
+-   `income`: Income categorical (0,3)
+
+First, we read the data:
+
+```{r}
+library(tidyverse)
+df <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/bauer2015.csv")                                                  
+summary(df)
+```
+
+Now, the simplest way to compare the covariates is to compare the means. We can look at the means between `threat = 1` (Treated group) and `threat = 0` (Control group):
+
+```{r}
+df %>%
+   group_by(threat) %>% 
+   summarise_at(vars("age", "male", "education","income"), mean)
+```
+
+Here, it appears that the means of the covariates are different across the treatment groups. This is expected, as we cannot expect `threat` to be a fully randomized treatment. We can additionally perform two-sample T-tests for each covariate:
+
+```{r}
+treated <- df[df$threat==1,]
+control <- df[df$threat==0,]
+t.test(treated$age, control$age)
+t.test(treated$male, control$male)
+t.test(treated$age, control$education)
+t.test(treated$age, control$income)
+```
+
+We can also put everything in a nicer table:
+
+```{r}
+list_var <- names(df)[4:7]
+
+#Empty dataframe
+columns <- c("Variable", "Treated Mean","Control Mean",
+             "Difference","T-stat","P-value") 
+out <- data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(out) <- columns
+
+#Add t test results
+for(i in 1:length(list_var)){
+  t <- t.test(treated[,list_var[i]], control[,list_var[i]])
+  res <- c(t$estimate[1],t$estimate[2],
+           t$estimate[1] - t$estimate[2],
+           t$statistic,t$p.value)
+  res <- round(as.numeric(res),3)
+  res <- c(list_var[i], res)
+  out[nrow(out) + 1,] <- res
+}
+out
+```
+
+One thing to note here is that even though it's a common practice amongst applied researchers to use t-test, as above, for examining covariates balancing, statisticians have cautioned against this, as it is not theoretically sound for various reasons. For example, the covariates balancing condition is about *in-sample* distributions of covariates, yet the T-test examines the hypotheses related to the *population means* of the groups.
+
+There are also other measures of covariates balance. Some of the more common ones are:
+
+-   **Standardized mean differences**. The standardized mean difference (SMD) is the difference in the means of each covariate between treatment groups standardized by a standardization factor so that it is on the same scale for all covariates. The standardization factor is typically the standard deviation of the covariate in the treated group when targeting the ATT or the pooled standard deviation across both groups when targeting the ATE. The standardization factor should be the same before and after matching to ensure changes in the mean difference are not confounded by changes in the standard deviation of the covariate. SMDs close to zero indicate good balance. The often recommended threshold is between 0.1 and 0.05 for prognostically important covariates.
+
+-   **Variance Ratios**. The variance ratio is the ratio of the variance of a covariate in one group to that in the other. Variance ratios close to 1 indicate good balance because they imply the variances of the samples are similar (Austin 2009).
+
+-   **Empirical CDF Statistics**. Statistics related to the difference in the empirical cumulative density functions (eCDFs) of each covariate between groups allow assessment of imbalance across the entire covariate distribution of that covariate rather than just its mean or variance. The maximum eCDF difference, also known as the **Kolmogorov-Smirnov statistic**, is sometimes recommended as a useful supplement to SMDs for assessing balance (Austin and Stuart 2015) and is often used as a criterion to use in propensity score methods that attempt to optimize balance (e.g., McCaffrey, Ridgeway, and Morral 2004; Diamond and Sekhon 2013).
+
+We can use `cobalt` library in R to quickly calculate these:
+
+```{r}
+library(cobalt)
+library(ggplot2)
+bal.tab(df[,4:7], treat = df$threat, binary = "std",
+        stats = c("m", "v", "ks"))
+```
+
+We can also use `love.plot()` function from the same package to plot the covariates balance:
+
+```{r}
+love.plot(df[,4:7], treat = df$threat,
+          continuous = "std",
+          binary = "std",
+          stats = c("m"),
+          thresholds = c(m = .1), line = TRUE)
+```
+
+# Regression
+
+Now, how do we estimate the causal effect (i.e., ATE) $\tau$ of `threat` on `trust`? We can try the "naive" difference-in-means estimate:
+
+$$
+\widehat{\tau}^{naive} = \mathbb{E}[Y|D =1] - \mathbb{E}[Y|D =0]
+$$
+
+This is denoted by the simple regression:
+
+```{r}
+mod.1 <- lm(trust ~ threat, df)
+summary(mod.1)
+```
+
+This can be interpreted as the ATE *only if* $\mathbb{E}[Y|D =1] - \mathbb{E}[Y|D =0] = \mathbb{E}[Y(1) - Y(0)]$, i.e., the mean of observed outcomes of the treated group can represent the mean of potential outcome if treated, and vice versa. This relies on Random treatment assignment assumption:
+
+$$
+D \perp \{Y(1),Y(0)\}
+$$
+
+If treatment is randomly assigned, we should also expect:
+
+$$
+D \perp \mathbf{X}
+$$
+
+I.e., the treatment is orthogonal to covariates, so the covariates should be similar across treatment groups. Yet, that is not what we observed here. Instead, in order to estimate the ATE, we make the *Strong Ignorability* assumption:
+
+$$
+\{Y(1),Y(0)\} \perp D | \mathbf{X}
+$$
+
+That is, *conditional on the covariates*, the potential outcomes are orthogonal to the treatment assignment. This is also called the *Unconfoundedness* assumption, that is, there is no unobserved variables that may affect both $D$ and $\{Y(1),Y(0)\}$.
+
+If we make this assumption, we can estimate the ATE by:
+
+$$
+\widehat{\tau} = \mathbb{E}[Y|D =1, X] - \mathbb{E}[Y|D =0, X]
+$$
+
+Now, we can estimate this with a linear regression:
+
+```{r}
+mod.2 <- lm(trust ~ threat + age + male + education + income, df)
+summary(mod.2)
+```
+
+Here, our $\widehat{\beta}_1$ is an estimate of the ATE, if the Strong Ignorability assumption holds. However, this estimate is subjected to our choice of specification (i.e., a linear regresison model). Next, we will discuss a more "non-parametric" approach to estimate the ATE, through matching.
+
+# Nearest Neighbor Matching:
+
+Instead of adjusting for selection on observable covariates through regression, we can also construct the counterfactual of each observation in the data through *matching*, by finding the most similar observations (in terms of the covariates) to an observation $i$, from the opposite treatment group. The most simple approach is exact matching, i.e. finding the observations that are exactly the same in both groups. We can try this:
+
+```{r}
+same_obs <- merge(treated, control, by = c("age", "male",
+                              "education","income"), all = FALSE)
+#Get unique treated obs
+same_obs_treated <- same_obs %>% group_by(id.x) %>% slice(1)
+#Get unique control obs
+same_obs_control <- same_obs %>% group_by(id.y) %>% slice(1)
+#Merge
+same_obs <- rbind(same_obs_treated, same_obs_control)
+#ITE
+same_obs$ITE <- same_obs$trust.x - same_obs$trust.y
+#ATE
+ATE <- mean(same_obs$ITE)
+ATE
+```
+
+Compare to above:
+
+```{r}
+mod.2$coefficients[2]
+```
+
+We see that both estimates are relatively similar. However, here, the exact matching procedure was only able to match some of observations:
+
+```{r}
+nrow(same_obs)
+```
+
+Thus, we are not taking full advantage of the data. Additionally, we were able to do exact matching here because the covariates are mostly ordinal. It's easy to imagine that exact matching is not feasible with contiuous variables like raw income in dollar terms. Instead, we often match on another similarity measure, the Mahalanobis distance:
+
+$$
+d(\mathbf{X}_i, \mathbf{X}_j) = \sqrt{(\mathbf{X}_i - \mathbf{X}_j) \mathbf{\Sigma}^{-1}(\mathbf{X}_i, \mathbf{X}_j)}
+$$
+
+With $\Sigma$ being the variance matrix (diagonal matrix from the variance-covariance matrix). We then use this distance to match on the $k$ nearest neighbors (in the opposite treatment group) in terms of distance, and the ITE would be: $$
+\widehat{\tau}_i = Y_i - \frac{1}{K}\sum_{n=1}^K Y_n^{matched}
+$$
+
+We do this manually in R. Let's match using $1$ closest neighbors:
+
+```{r}
+k <- 1
+treated_match <- c()
+for(i in 1:nrow(treated)){
+  d <- mahalanobis(as.matrix(control[,4:7]),
+                   as.matrix(treated[i, 4:7]),
+                   cov = cov(df[,4:7]))
+  d <- unname(d)
+  treated_match[i] <- mean(control$trust[order(d)[1:k]])
+}
+
+control_match <- c()
+for(i in 1:nrow(control)){
+  d <- mahalanobis(as.matrix(treated[,4:7]),
+                   as.matrix(control[i, 4:7]),
+                   cov = cov(df[,4:7]))
+  d <- unname(d)
+  control_match[i] <- mean(treated$trust[order(d)[1:k]])
+}
+
+ITE_treated <- treated$trust - treated_match
+ITE_control <- control_match - control$trust
+ITE <- c(ITE_control, ITE_treated)
+#ATT
+mean(ITE_treated)
+#ATC
+mean(ITE_control)
+#ATE
+mean(ITE)
+```
+
+We can also use the `MatchIt` package:
+
+```{r}
+library(MatchIt)
+m.out <- matchit(threat ~  age + male + education + income, data = df, method = "nearest",
+        distance = "mahalanobis", estimand = 'ATT', ratio = 1,  replace = TRUE)
+m.treated <- get_matches(m.out, id = 'idx')
+m.out2 <- matchit(threat ~  age + male + education + income, data = df, method = "nearest",
+        distance = "mahalanobis", estimand = 'ATC', ratio = 1,  replace = TRUE)
+m.control <- get_matches(m.out2, id = 'idx')
+```
+
+Now, to get the ATT and ATC, we can compare the matched data provided by: `MatchIt`.
+
+```{r}
+ATT <- mean(m.treated[m.treated$threat==1,"trust"]) - mean(m.treated[m.treated$threat==0,"trust"])
+ATT
+ATC <- mean(m.control[m.control$threat==1,"trust"]) - mean(m.control[m.control$threat==0,"trust"])
+ATC
+ATE <- (ATT*nrow(treated) + ATC*nrow(control))/nrow(df)
+ATE
+```
+
+Here we see that the ATT is exactly the same, but the ATC is a little different, leading to different ATE. This is because of the different tie-breaking rules used by `MatchIt` and by our implementation above (i.e., which observation to select when there are more than one matches with the same distance). With `MatchIt` output, we can also use `cobalt` to check the covariate balancing:
+
+```{r}
+bal.tab(m.out, treat = df$threat, binary = "std",
+        stats = c("m", "v", "ks"))
+love.plot(m.out, binary = "std",
+           stats = c("m"),
+           thresholds = c(m = .1), line = TRUE)
+```
+
+We see that, after matching, the covariates are now much more balanced. We can also compare the distributions:
+
+```{r}
+bal.plot(m.out, var.name = 'age', which = "both")
+bal.plot(m.out, var.name = 'male', which = "both")
+bal.plot(m.out, var.name = 'income', which = "both")
+bal.plot(m.out, var.name = 'education', which = "both")
+```
+
+# Bias correction
+
+In the previous section, we can see that our matched data have very balanced covariates distribution. However, the covariates are still not exactly the same (exactly matching only feasible for less than half of the data), and in cases with many continuous covariates, we will certainly run into bad matches. This can bias our treatment effects estimate. We can alleviate this with a simple bias correction trick proposed by Abadie and Imbens (2011):
+
+$$
+\widehat{\tau}_i^{BC} = Y_i - Y_i^{matched} - \left( \widehat{\mu}(\mathbf{X}_i) - \widehat{\mu}(\mathbf{X}_i^{matched})\right)
+$$
+
+Here, $\widehat{\mu}()$ is the regression of the outcome on the covariates (on full data). This will account for some difference in covariates remained after matching. We can do this by:
+
+```{r}
+#mu 
+mod.3 <- lm(trust ~  age + male + education + income, df)
+#Get prediction
+m.treated$pred <- predict(mod.3, m.treated)
+m.control$pred <- predict(mod.3, m.control)
+#ATT:
+ATT <- mean(m.treated[m.treated$threat==1,"trust"]) - mean(m.treated[m.treated$threat==0,"trust"]) -(mean(m.treated[m.treated$threat==1,"pred"]) - mean(m.treated[m.treated$threat==0,"pred"]))
+ATT
+#ATC:
+ATC<- mean(m.control[m.control$threat==1,"trust"]) - mean(m.control[m.control$threat==0,"trust"]) -(mean(m.control[m.control$threat==1,"pred"]) - mean(m.control[m.control$threat==0,"pred"]))
+ATC
+#ATE
+ATE <- (ATT*nrow(treated) + ATC*nrow(control))/nrow(df)
+ATE
+```
+
+# Propensity score methods
+
+## Propensity Score Matching
+
+Instead of matching on the observed covariates, which can run into dimensionality curse if we have to too many covariates, it can be shown that controlling for the observables is the same as controlling for the *Propensity score*, which is:
+
+$$
+e(X_i) = Pr(D_i = 1 | X_i)
+$$
+
+We can see that this propensity score is uni-dimensional, thus we won't have to worry about the curse of dimensionality. We can estimate this propensity score using a binary GLM model, such as `logit()`:
+
+```{r}
+mod.ps <- glm(threat ~  age + male + education + income, data = df,
+                  family = binomial(link = 'logit'))
+df$ps <- predict(mod.ps, type = 'response')
+treated$ps <- predict(mod.ps, type = 'response', newdata = treated)
+control$ps <- predict(mod.ps, type = 'response', newdata = control)
+```
+
+Now, we can apply the same nearest neighbor matching as above, but with the propensity score:
+
+```{r}
+k <- 1
+treated_match <- c()
+for(i in 1:nrow(treated)){
+  d <- mahalanobis(as.matrix(control$ps),
+                   as.matrix(treated[i,]$ps),
+                   cov = var(df$ps))
+  d <- unname(d)
+  treated_match[i] <- mean(control$trust[order(d)[1:k]])
+}
+
+control_match <- c()
+for(i in 1:nrow(control)){
+  d <- mahalanobis(as.matrix(treated$ps),
+                   as.matrix(control[i,]$ps),
+                   cov = var(df$ps))
+  d <- unname(d)
+  control_match[i] <- mean(treated$trust[order(d)[1:k]])
+}
+
+ITE_treated <- treated$trust - treated_match
+ITE_control <- control_match - control$trust
+ITE <- c(ITE_control, ITE_treated)
+#ATT
+mean(ITE_treated)
+#ATC
+mean(ITE_control)
+#ATE
+mean(ITE)
+```
+
+We can also use `MatchIt()`:
+
+```{r}
+m.out <- matchit(threat ~  age + male + education + income, data = df, method = "nearest",
+        distance = "glm", estimand = 'ATT', ratio = 1,  replace = TRUE)
+m.treated <- get_matches(m.out, id = 'idx')
+m.out2 <- matchit(threat ~  age + male + education + income, data = df, method = "nearest",
+        distance = "glm", estimand = 'ATC', ratio = 1,  replace = TRUE)
+m.control <- get_matches(m.out2, id = 'idx')
+
+ATT <- mean(m.treated[m.treated$threat==1,"trust"]) - mean(m.treated[m.treated$threat==0,"trust"])
+ATT
+ATC <- mean(m.control[m.control$threat==1,"trust"]) - mean(m.control[m.control$threat==0,"trust"])
+ATC
+ATE <- (ATT*nrow(treated) + ATC*nrow(control))/nrow(df)
+ATE
+```
+
+Here, once again we observed different results, due to different tie-breaking rules, between observations with the same propensity scores. We can also investigate the balance:
+
+```{r}
+bal.tab(m.out, treat = df$threat, binary = "std",
+        stats = c("m", "v", "ks"))
+love.plot(m.out, binary = "std",
+           stats = c("m"),
+           thresholds = c(m = .1), line = TRUE)
+```
+
+```{r}
+bal.plot(m.out, var.name = 'age', which = "both")
+bal.plot(m.out, var.name = 'male', which = "both")
+bal.plot(m.out, var.name = 'income', which = "both")
+bal.plot(m.out, var.name = 'education', which = "both")
+bal.plot(m.out, var.name = 'distance', which = "both")
+```
+
+Now, we can see that our covariates look balanced, but not as good as we have with the previous multidimensional matching procedure. This is because we have additional bias induced by the estimation error of the logit model. If the logit model has exactly accuracy, often called an oracle, then we would have observed the exact same results. Of course, this is never the case in practice, and the choice between propensity or multidimensional matching should be made with the trade off between computational difficulty and high variance due to the curse of dimensionality vs. additional bias due to the approximate error of propensity score in mind. We can also try the bias reduction technique in the previous section:
+
+```{r}
+#Get prediction
+m.treated$pred <- predict(mod.3, m.treated)
+m.control$pred <- predict(mod.3, m.control)
+#ATT:
+ATT <- mean(m.treated[m.treated$threat==1,"trust"]) - mean(m.treated[m.treated$threat==0,"trust"]) -(mean(m.treated[m.treated$threat==1,"pred"]) - mean(m.treated[m.treated$threat==0,"pred"]))
+ATT
+#ATC:
+ATC<- mean(m.control[m.control$threat==1,"trust"]) - mean(m.control[m.control$threat==0,"trust"]) -(mean(m.control[m.control$threat==1,"pred"]) - mean(m.control[m.control$threat==0,"pred"]))
+ATC
+#ATE
+ATE <- (ATT*nrow(treated) + ATC*nrow(control))/nrow(df)
+ATE
+```
+
+## Inverse Probability Weighting (IPW)
+
+So far, we have focused on methods such as matching to adjust for observed confounders when estimating causal effects. Another powerful approach that leverages the propensity score is known as **Inverse Probability Weighting (IPW)**. Instead of selecting matched comparisons, IPW uses the estimated propensity score to **reweight the sample**, effectively creating a pseudo-population in which treatment status is independent of the observed covariates.
+
+### Conceptual Overview
+
+The fundamental idea behind IPW is to assign weights to each observation based on the inverse of its probability of receiving the treatment it actually received. If a subject has a high probability of treatment given their covariates (i.e., their propensity score is large), that subject is assigned a smaller weight, since their characteristics are overrepresented in the treatment group relative to the control group. Conversely, if a subject has a low probability of receiving treatment, their contribution to the reweighted population is more pronounced because their characteristics are underrepresented.
+
+By reweighting the sample in this manner, IPW aims to produce a scenario that resembles a randomized experiment, in which the distribution of covariates is balanced between the treated and untreated groups. Under the strong ignorability assumption, the reweighted outcomes can be compared directly to obtain an estimate of the Average Treatment Effect (ATE).
+
+### The Horvitz-Thompson Estimator
+
+The IPW estimator for the ATE can be traced back to the work of Horvitz and Thompson (1952). If we denote the propensity score by $p(X_i) = \Pr(D_i = 1 \mid X_i)$, the Horvitz-Thompson form of the ATE estimator is given by:
+
+$$
+\widehat{ATE} = \frac{1}{N} \sum_{i=1}^N Y_i \left(\frac{D_i}{p(X_i)} - \frac{1 - D_i}{1 - p(X_i)}\right).
+$$
+
+Here, each treated observation $i$ receives a weight of $1/p(X_i)$, and each control observation $i$ receives a weight of $1/(1 - p(X_i))$. Intuitively, individuals whose observed treatment assignment was unlikely (based on their covariates) receive more weight, helping to "fill in" the parts of the covariate distribution that are sparsely represented in one treatment arm.
+
+### Practical Considerations
+
+1.  **Positivity Assumption**:\
+    The IPW approach relies on the **positivity assumption**, meaning that for all values of $X$ in the support, the probability of treatment must not be 0 or 1. In practice, if some subjects have extremely low or high propensity scores, their weights can become very large, increasing the variance of the estimator and potentially leading to unstable estimates.
+
+2.  **Trimming and Stabilization**:\
+    To address extreme weights, researchers often "trim" the sample to exclude observations with propensity scores very close to 0 or 1. For instance, one might restrict the sample to those with $0.05 < p(X) < 0.95$. Another approach is to use **stabilized weights**, which incorporate the marginal probability of treatment to reduce variance while preserving consistency.
+
+We can apply this to our case, using the estimated propensity score. The common practice is to additionally "trim" the data, removing observations with too low or too high propensity score:
+
+```{r}
+df <- df %>%
+  mutate(ipw1 = (threat/ps),
+         ipw0 = (1 - threat)/(1 - ps))
+df2 <- df %>%
+  filter(ps > 0.05 & ps < 0.95)
+ATE <- mean(df2$trust * df2$ipw1) - mean(df2$trust * df2$ipw0) 
+ATE
+```
+
+Here, we see that the obtained ATE is close to the previous estimates. If we do not trim the propensity however:
+
+```{r}
+mean(df$trust * df$ipw1) - mean(df$trust * df$ipw0) 
+```
+
+This is due to the fact that our propensity scores were estimated.
+
+### Hájek estimator
+
+The Horvitz-Thompson Estimator above was derived from an assume "oracle" (perfectly accurate) propensity score, which is usally not a reasonable assumption. In finite sample cases, the follow estimator of IPW ATE by Hájek is more preferrable:
+
+$$
+\widehat{ATE} = \frac{\sum_{i=1}^N Y_i D_i/\widehat{p}(X_i)}{\sum_{i=1}^N D_i/\widehat{p}(X_i)} - \frac{\sum_{i=1}^N Y_i(1 - D_i)/(1 - \widehat{p}(X_i))}{\sum_{i=1}^N (1 - D_i)/(1 - \widehat{p}(X_i))}.
+$$
+
+Here, the weight of treated units are $\frac{D_i/\widehat{p}(X_i)}{ E[D_i/\widehat{p}(X_i)]}$, and for control units are $\frac{(1 - D_i)/(1 - \widehat{p}(X_i))}{E[(1 - D_i)/(1 - \widehat{p}(X_i))]}$, that is, H-T weights normalized by expectations of the weights.
+
+```{r}
+df <- df %>%
+  mutate(ipw_hajek1 = ipw1/mean(df$ipw1),
+         ipw_hajek0 = ipw0/mean(df$ipw0))
+
+ATE <-  mean(df$trust * df$ipw_hajek1) - mean(df$trust * df$ipw_hajek0) 
+ATE
+```
+
+Here, we can see that trimming is no longer necessary.
+
+### `WeightIt` Package
+
+We can also use `WeightIt` package, a one-stop package to generate balancing weights for point and longitudinal treatments in observational studies, to generate IPW results.
+
+```{r}
+# Load the package
+library(WeightIt)
+# Estimate the pscore
+pscore_w <- weightit(threat ~  age + male + education + income,
+                     data = df, 
+                     method = "glm", 
+                     estimand = "ATE",
+                     stabilize = TRUE)
+
+ate_ipw_w <- lm_weightit(trust ~ threat, data = df, weightit = pscore_w, vcov = "HC0")
+  summary(ate_ipw_w)
+```
+
+We can also estimate ATT, for example:
+
+```{r}
+# Estimate weight
+pscore_w_att <- weightit(threat ~  age + male + education + income,
+                     data = df, 
+                     method = "glm", 
+                     estimand = "ATT")
+
+att_ipw_w <- lm_weightit(trust ~ threat, data = df, weightit = pscore_w_att, vcov = "asympt")
+  summary(att_ipw_w)
+
+# Estimate weight
+pscore_w_atc <- weightit(threat ~  age + male + education + income,
+                     data = df, 
+                     method = "glm", 
+                     estimand = "ATC")
+
+atc_ipw_w <- lm_weightit(trust ~ threat, data = df, weightit = pscore_w_atc, vcov = "asympt")
+  summary(atc_ipw_w)
+```
+
+### IPW Combined with Regression Adjustment (IPWRA)
+
+While IPW alone can deliver consistent ATE estimates (if the propensity score model is correctly specified), it can sometimes be improved by combining it with an outcome model. This approach, known as **Inverse Probability Weighted Regression Adjustment (IPWRA)**, involves two steps:
+
+1.  Estimate the propensity scores and compute IP weights as above.
+2.  Fit an outcome regression model weighted by these IP weights to adjust further for any residual covariate imbalance.
+
+The IPWRA estimator is "double robust," meaning that if **either** the propensity score model **or** the outcome regression model is correctly specified, the IPWRA estimator will yield consistent estimates of the ATE.
+
+For example:
+
+```{r}
+df <- df %>%
+   mutate(ip_weights = ifelse(threat == 1, 1 / ps, 1 / (1 - ps)))
+
+mod.4 <- lm(trust ~ threat + age + male + income + education, 
+            data = df, 
+            weights = ip_weights)
+summary(mod.4)
+```
+
+The coefficient on `threat` now provides an IPWRA-based estimate of the ATE. Compared to a simple regression or IPW alone, IPWRA is often more robust. If the propensity score model is slightly misspecified but the outcome model is correct (or vice versa), IPWRA can still perform well.
+
+**End note:** It's prudent to remember that the methods we covered here all rely on the strong ignorability/ unconfoundedness assumption, i.e. we are assuming that selection into treatment can be identified with the observables. In real world, this is often not the case, as most of the time selection into treatment may be due to some unobserved factors. There are more advanced causal inference methods for this case, such as Difference-in-Differences, Instrumental Variable, Regression Discontinuity etc., which are out of scope for this class.

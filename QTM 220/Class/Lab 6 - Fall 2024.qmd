@@ -1,0 +1,357 @@
+---
+title: "Lab 6"
+author: "F. Nguyen"
+date: " 10 Oct 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Covariate Shift in Observational Data
+
+## Understanding Covariate Shift
+
+Covariate shift occurs when the *distribution of covariates differs between the treatment and control groups*. In observational studies, where treatment assignment is not random, this can lead to biased estimates of the treatment effect if not properly adjusted.
+
+```{r}
+library(causaldata)
+library(tidyverse)
+library(Matching)
+```
+
+## Example: National Supported Work Demonstration Program Evaluation
+
+To demonstrate covariate shift, first we can take a look at the following dataset by Dehejia and Wahba (1999) on the effect of National Supported Work Demonstration Program. The dataset 445 observations, corresponding to 185 treated and 260 control subjects, and 10 variables. The treatment assignment indicator is the first variable of the data frame: `treat` (1 = treated; 0 = control). The next 7 columns are the covariates: - `age`, measured in years;
+
+```         
+- `educ`, measured in years;
+
+- `black`, indicating race (1 if black, 0 otherwise);
+
+- `hisp`, indicating race (1 if Hispanic, 0 otherwise);
+
+- `married`, indicating marital status (1 if married, 0 otherwise);
+
+- `nodegr`, indicating high school diploma (1 if no degree, 0 otherwise);
+
+- `re74`, real earnings in 1974;
+
+- `re75`, real earnings in 1975.
+```
+
+The last variable of the data frame is `re78`, the real the earnings in 1978.
+
+```{r}
+# Load data
+data("lalonde")
+head(lalonde)
+```
+
+To show the covariate shift between the two groups: Treated group which participated in the program (`treat = 1`) and Control group which did not participate in the program (`treat = 0`)
+
+```{r}
+lalonde %>%
+  group_by(treat) %>%
+  summarise(
+    count = n(),
+    age = mean(age, na.rm = T),
+    educ = mean(educ, na.rm = T),
+    black = mean(black, na.rm = T),
+    hisp = mean(hisp, na.rm = T),
+    married = mean(married, na.rm = T),
+    nodegree = mean(nodegr, na.rm = T),
+    re74 = mean(re74, na.rm = T),
+    re75 = mean(re75, na.rm = T),
+    re78 = mean(re78, na.rm = T)
+  )
+```
+
+Here, we can see that there is a clear difference between the covariate means between the two groups. To further demonstrate this, let's plot the distributions of Education (in years), by groups:
+
+```{r}
+ggplot(lalonde, aes(x = educ, fill = as.factor(treat))) +
+  geom_histogram(position = "identity", alpha = 0.5, binwidth = 0.5) +
+  labs(title = "Histograms of Education by Treatment Groups",
+       x = "Education",
+       y = "Count") +
+  theme_minimal()
+```
+
+We can also check other variables such as `re74`:
+
+```{r}
+ggplot(lalonde, aes(x = re74, fill = as.factor(treat))) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histograms of 1974 Earnings by Treatment Groups",
+       x = "Earnings",
+       y = "Count") +
+  theme_minimal()
+```
+
+We can see that there are more people in the control groups who were unemployed in 1974. Now, we have the simple difference in outcome (`re78`) between the two groups:
+
+```{r}
+treated <- lalonde[lalonde$treat == 1,]
+control <- lalonde[lalonde$treat == 0,]
+mean(treated$re78) - mean(control$re78)
+t.test(treated$re78, control$re78)
+```
+
+Now, can we say that the program has a significant effect on the real earnings in 1978? Not quite so! As we can see, since the covariates are very different, the difference in earning could come from other sources. For example, we see that there are more people in the treated group with tertiary education, and we also see that more people in the control group were unemployed in 1974, amongst many other potential reasons. To account for this, we can instead calcuate the adjusted difference. For example, if we want to account for the covariate shift in education:
+
+```{r}
+# this is our difference adjusted for education
+control_avg <- control %>%
+  group_by(educ) %>%
+  summarise(avg_re78_control = mean(re78, na.rm = TRUE)) %>%
+  ungroup()
+
+treated <- treated %>%
+    left_join(control_avg, by = "educ")
+mean(treated$re78 - treated$avg_re78_control, na.rm = T)
+```
+
+We can adjust for other variables, such as `hisp`:
+
+```{r}
+# this is our difference adjusted for self-reported hispanic
+# same syntax as education, but add hispanic
+treated <- lalonde[lalonde$treat == 1,]
+control <- lalonde[lalonde$treat == 0,]
+
+control_avg <- control %>%
+  group_by(hisp) %>%
+  summarise(avg_re78_control = mean(re78, na.rm = TRUE)) %>%
+  ungroup()
+
+treated <- treated %>%
+    left_join(control_avg, by = "hisp")
+mean(treated$re78 - treated$avg_re78_control, na.rm = T)
+```
+
+It is of course also possible to construct the confidence interval for this, using the bootstrap:
+
+```{r}
+set.seed(42)
+
+#Save the difference
+n <- 10000
+diff.boot <- rep(NA, n)
+#Loop
+for(i in 1:n){
+  sample_boot<-  lalonde[sample(1:nrow(lalonde), nrow(lalonde), replace = T),]
+  treated.boot <- sample_boot[sample_boot$treat == 1,]
+  control.boot  <- sample_boot[sample_boot$treat == 0,]
+  
+  control_avg <- control.boot %>%
+  group_by(hisp) %>%
+  summarise(avg_re78_control = mean(re78, na.rm = TRUE)) %>%
+  ungroup()
+  
+  treated.boot <- treated.boot %>%
+    left_join(control_avg, by = "hisp")
+
+  diff.boot[i] <- mean(treated.boot$re78 - treated.boot$avg_re78_control, na.rm = T)
+}
+```
+
+Now, we can have the CI as:
+
+```{r}
+quantile(diff.boot, c(0.025, 0.975))
+abs(quantile(diff.boot, 0.975) - quantile(diff.boot, 0.025))
+```
+
+# Causal Inference
+
+## Randomized Control Trials (RCTs)
+
+A Randomized Control Trial (RCT) is an experimental design where participants are randomly assigned to either the treatment or control group. This randomization ensures that, on average, the groups are comparable in all respects except for the treatment. The benefits of randomized treatment are:
+
+-   Eliminate Confounding: Randomization balances both observed and unobserved covariates across groups.
+-   Causal Interpretation: Facilitates causal claims about the effect of the treatment.
+
+## Simulating RCT:
+
+Suppose we want to evaluate the effect of a new drug on blood pressure reduction. We will simulate the effect using the formula:
+
+$$
+BPR_i = 50 + 10 \times Treat_i + 0.5 \times Age_i + 2 \times Male_i + \varepsilon_i
+$$
+
+```{r}
+# here, we're creating a randomized dataset
+set.seed(42)
+
+# Number of obs
+n <- 10000
+
+# Simulate covariates
+age <- round(rnorm(n, mean = 50, sd = 15))
+gender <- sample(0:1, n, replace = TRUE)
+
+# Treatment assignment (ie, randomization)
+treatment <- sample(c(0, 1), n, replace = TRUE)
+
+# Simulate outcome variable (Blood Pressure Reduction)
+bp_reduction <- 50 + 0.5*age - 2*gender + 10*treatment + rnorm(n, mean = 0, sd = 1)
+
+# Create data frame
+rct_data <- data.frame(
+  Age = age,
+  Gender = gender,
+  Treatment = treatment,
+  BP_Reduction = bp_reduction
+)
+
+head(rct_data)
+# as the sample size increases, the data converges to the average in the population
+```
+
+Now, since this treatment is randomized, unconditional on the variables, we can expect the covariates to be balanced:
+
+```{r}
+# what does it mean for the covariates to be balanced
+rct_data %>%
+  group_by(Treatment) %>%
+  summarise(
+    count = n(),
+    age = mean(Age, na.rm = T),
+    gender = mean(Gender, na.rm = T),
+    BP_Reduction = mean(BP_Reduction, na.rm = T),
+  )
+```
+
+Here we see that covariate means are almost the same, so we can expect them to be balance. The ATE is then just a simple difference in means:
+
+```{r}
+# Calculate mean BP reduction for treated and control
+mean_treated <- mean(rct_data$BP_Reduction[rct_data$Treatment == 1]) 
+mean_control <- mean(rct_data$BP_Reduction[rct_data$Treatment == 0])
+
+# ATE estimate
+ate <- mean_treated - mean_control
+
+cat("ATE = ", round(ate, 2), "units")
+```
+
+We see that the ATE is about the same as our true ATE. Here the ATT and the ATC are also the same as ATE, as our treatment is randomized.
+
+## Conditional Randomization
+
+**Conditional Randomization** implies that the treatment assignment is independent of potential outcomes given certain covariates. In other words, once we account for these covariates, the treatment assignment mimics that of a RCT, ensuring unbiased estimation of causal effects.
+
+This assumption is crucial in observational studies where treatment assignment might be influenced by confounders (variables that affect both the treatment and the outcome). By conditioning on these confounders, we aim to isolate the effect of the treatment on the outcome.
+
+```{r}
+# Cond random function
+generate_conditional_randomization_data <- function(n = 10000, seed = 42) {
+  set.seed(seed)
+
+  # Simulate covariates
+  age <- round(rnorm(n, mean = 50, sd = 15))
+  gender <- sample(0:1, n, replace = TRUE)
+  
+  # 2. Treatment Assignment
+  # Assume that probability of treatment increases with age and and differs by gender
+  # We use a logistic model for treatment assignment
+  # Logit(P(Treatment=1)) = -5 + 0.05*Age + 0.5*(Gender == "Male")
+  
+  # Calculate P(treat|X)
+  # this is logistic regression
+  logits <- -5 + 0.1* age + 0.5 * gender
+  p_treat <- 1 / (1 + exp(-logits))
+  
+  # Assign treatment based on propensity scores
+  treatment <- rbinom(n, 1, p_treat)
+  
+  # 3. Generate Potential Outcomes
+ 
+ # Simulate outcome variable (Blood Pressure Reduction)
+  bp_reduction <- 50 + .5*age - 2*gender + 10*treatment + rnorm(n, mean = 0, sd = 8)
+  # Create data frame
+  data <- data.frame(
+  Age = age,
+  Gender = gender,
+  Treatment = treatment,
+  BP_Reduction = bp_reduction
+  )
+  
+  return(data)
+}
+
+```
+
+Now, let's generate the data:
+
+```{r}
+# Generate the dataset
+conditional_data <- generate_conditional_randomization_data(n = 10000, seed = 42)
+
+# View the first few rows
+head(conditional_data)
+```
+
+If we calculate the ATE, we get:
+
+```{r}
+# Calculate mean BP reduction for treated and control
+mean_treated <- mean(conditional_data$BP_Reduction[conditional_data$Treatment == 1]) 
+mean_control <- mean(conditional_data$BP_Reduction[conditional_data$Treatment == 0])
+
+# ATE estimate
+ate <- mean_treated - mean_control
+
+cat("ATE = ", round(ate, 2), "units")
+```
+
+We see that this is very far from our actual ATE. Instead, we can calculate CATE. To calculate CATE, we need to define meaningful subgroups based on covariates. For this example, we'll use `Gender` and `Age.` We'll categorize `Age` into tertiles (three groups: Young, Middle-aged, Old) to create subgroups.
+
+```{r}
+# Define Age groups
+conditional_data <- conditional_data %>%
+  mutate(
+    Age_Group = ntile(Age, 3),  
+    Age_Group = case_when(
+      Age_Group == 1 ~ "Young",
+      Age_Group == 2 ~ "Middle-aged",
+      Age_Group == 3 ~ "Old"
+    )
+  )
+
+# Convert Gender and Age_Group to factors for clarity
+conditional_data <- conditional_data %>%
+  mutate(
+    Age_Group = factor(Age_Group, levels = c("Young", "Middle-aged", "Old"))
+  )
+
+# View the updated data
+head(conditional_data)
+```
+
+Now, the CATE can be calculated by:
+
+```{r}
+# Calculate CATE using subsample means
+cate_subsample <- conditional_data %>%
+  group_by(Gender, Age_Group) %>%
+  summarise(
+    N_Treated = sum(Treatment == 1),
+    N_Control = sum(Treatment == 0),
+    Mean_Treated = mean(BP_Reduction[Treatment == 1]),
+    Mean_Control = mean(BP_Reduction[Treatment == 0]),
+    CATE = Mean_Treated - Mean_Control
+  ) %>%
+  ungroup()
+
+# View the CATE estimates
+print(cate_subsample)
+```
+
+We see that each CATE is roughly similar to our real ATE.

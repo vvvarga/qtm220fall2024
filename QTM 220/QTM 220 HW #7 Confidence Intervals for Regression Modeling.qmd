@@ -1,0 +1,270 @@
+---
+title: "QTM 220 HW #7"
+author: "Veronica Vargas"
+format: html
+editor: visual
+---
+
+# Exercise #1
+
+## Simple Linear Regression
+
+```{r}
+library(tidyverse)
+library(mosaicData)
+library(leaps)
+library(caret)
+library(ISLR2)
+library(ggplot2)
+library(datasets)
+library(boot)
+```
+
+### (a) Scatterplot
+
+```{r}
+data("mtcars")
+head(mtcars)
+```
+
+```{r}
+ggplot(mtcars, aes(x = hp, y = mpg)) +
+  geom_point(aes(x = hp, y = mpg),
+             alpha = 0.3) +
+  labs(
+    title = "hp vs. mpg",
+    x = "hp",
+    y = "mpg") +
+  theme_minimal()
+```
+
+### (b) Linear Regression
+
+```{r}
+mod.simple <- lm(mpg ~ hp, data = mtcars)
+summary(mod.simple)
+```
+
+```{r}
+mtcars$predicted_score_simple <- predict(mod.simple)
+```
+
+```{r}
+ggplot(mtcars, aes(x = hp, y = mpg)) +
+  geom_point(alpha = 0.5) +
+  geom_line(aes(y = predicted_score_simple), color = "blue", size = 1) +
+  theme_minimal() +
+  labs(title = "Regression of Miles per Gallon on Horsepower", x = "Horsepower", y = "Miles per Gallon")
+```
+
+### (c) Hypothesis Testing
+
+```{r}
+library(car)
+linearHypothesis(mod.simple, "hp")
+```
+
+### (e) 95% Confidence Interval
+
+```{r}
+coef_hp <- coef(mod.simple)["hp"]
+se_hp <- summary(mod.simple)$coefficients["hp", "Std. Error"]
+
+df <- mod.simple$df.residual
+t_critical <- qt(1 - 0.05 / 2, df)
+
+lower_bound <- coef_hp - t_critical * se_hp
+upper_bound <- coef_hp + t_critical * se_hp
+
+lower_bound
+upper_bound
+```
+
+### (f) Fitted Regression Line
+
+```{r}
+newdata <- with(mtcars, expand.grid(hp = seq(min(hp), max(hp), length.out = 100)))
+```
+
+```{r}
+preds <- predict(mod.simple, newdata, interval = "confidence") 
+preds_pred <- predict(mod.simple, newdata, interval = "prediction")
+```
+
+```{r}
+newdata$fit <- preds[, "fit"]
+newdata$lower_conf <- preds[, "lwr"]
+newdata$upper_conf <- preds[, "upr"]
+newdata$lower_pred <- preds_pred[, "lwr"]
+newdata$upper_pred <- preds_pred[, "upr"]
+```
+
+```{r}
+ggplot(mtcars, aes(x = hp, y = mpg)) + 
+  geom_point(alpha = 0.5) +
+  geom_line(aes(y = predicted_score_simple), color = "blue", size = 1) +
+  geom_segment(aes(x = hp, xend = hp, y = mpg, yend = predicted_score_simple), color = "red", alpha = 0.3) +
+  geom_ribbon(data = newdata, aes(x = hp, y = fit,
+                                  ymin = lower_conf, ymax = upper_conf), color = "blue", fill = "lightblue", alpha = 0.4) + 
+  geom_ribbon(data = newdata, aes(x = hp, y = fit,
+                                  ymin = lower_pred, ymax = upper_pred), color = "red", fill = "pink", alpha = 0.2) +
+  labs(title = "Regression of Miles per Gallon on Horsepower", x = "Horsepower", y = "Miles per Gallon") +
+  theme_minimal()
+```
+
+### (g) MSE & RMSE
+
+```{r}
+# MSE
+mean(residuals(mod.simple)^2)
+
+#RMSE
+sqrt(mean(residuals(mod.simple)^2))
+```
+
+### (h) Considering R-Squared
+
+# Exercise #2
+
+## Assumptions and Confidence Intervals
+
+### (a) Linear Model
+
+```{r}
+data("Gestation")
+head(Gestation)
+
+Gestation_clean <- Gestation[!is.na(Gestation$age), ]
+
+Gestation_clean
+```
+
+```{r}
+mod.simple <- lm(wt ~ age, data = Gestation_clean)
+summary(mod.simple)
+```
+
+```{r}
+Gestation_clean$predicted_score_simple <- predict(mod.simple)
+
+coef_age <- coef(mod.simple)["age"]
+se_age <- summary(mod.simple)$coefficients["age", "Std. Error"]
+```
+
+```{r}
+df <- mod.simple$df.residual
+t_critical <- qt(1 - 0.05 / 2, df)
+
+lower_bound_95 <- coef_age - t_critical * se_age
+upper_bound_95 <- coef_age + t_critical * se_age
+
+lower_bound_95
+upper_bound_95
+```
+
+```{r}
+df <- mod.simple$df.residual
+t_critical <- qt(1 - 0.10 / 2, df)
+
+lower_bound_90 <- coef_age - t_critical * se_age
+upper_bound_90 <- coef_age + t_critical * se_age
+
+lower_bound_90
+upper_bound_90
+```
+
+### (b) Sandwich Package
+
+```{r}
+robust_vcov <- vcovHC(mod.simple, type = "HC1")
+
+library(lmtest)
+coeftest(mod.simple, vcov = robust_vcov)
+
+summary(mod.simple)$coefficients[, "Std. Error"]
+
+robust_se <- sqrt(diag(robust_vcov))
+robust_se
+```
+
+```{r}
+df_resid <- mod.simple$df.residual
+
+crit_val <- qt(0.975, df = df_resid)
+```
+
+```{r}
+coef_estimates <- coef(mod.simple)
+
+conf_lower <- coef_estimates - crit_val * robust_se
+conf_upper <- coef_estimates + crit_val * robust_se
+
+conf_lower
+conf_upper
+```
+
+### (c) Bootstrap Method
+
+```{r}
+boot_fn <- function(data, indices) {
+  d <- data[indices, ]
+  fit <- lm(wt ~ age, data = d)
+  return(coef(fit))
+}
+```
+
+```{r}
+set.seed(123) 
+boot_results <- boot(data = Gestation_clean, statistic = boot_fn, R = 1000)
+```
+
+```{r}
+boot_results
+```
+
+```{r}
+boot.ci(boot_results, type = "perc", index = 2)
+```
+
+# Exercise #3
+
+## Dealing w/ Categorical Variables
+
+```{r}
+data("Salaries")
+head(Salaries)
+```
+
+```{r}
+mod.simple <- lm(salary ~ sex, data = Salaries)
+summary(mod.simple)
+```
+
+```{r}
+ggplot(Salaries, aes(x = sex, y = salary, color = sex)) +
+  geom_jitter(width = 0.3, alpha = 0.5) +
+  geom_point(aes(y = fitted(mod.simple)), color = "black", shape = 1, size = 2) +
+  theme_minimal() +
+  labs(title = "Salary by Sex", x = "Sex", y = "Salary")
+```
+
+### (b) Repeating w/ Different Regressor
+
+```{r}
+mod.simple <- lm(salary ~ discipline, data = Salaries)
+summary(mod.simple)
+```
+
+```{r}
+ggplot(Salaries, aes(x = discipline, y = salary, color = discipline)) +
+  geom_jitter(width = 0.3, alpha = 0.5) +
+  geom_point(aes(y = fitted(mod.simple)), color = "black", shape = 1, size = 2) +
+  theme_minimal() +
+  labs(title = "Salary by Discipline", x = "Discipline", y = "Salary")
+```
+
+### (c) Parallel Lines Model
+
+```{r}
+
+```

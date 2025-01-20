@@ -1,0 +1,503 @@
+---
+title: "Lab 7 - OLS Intro"
+author: "F. Nguyen"
+date: " 17 Oct 2024"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# OLS in R
+
+Let's start by learning how to estimate simple linear regressions with an actual dataset. For this, we're using the Current Population Survey data from March 2009, courtesy of the US Census Bureau. You'll find this dataset on Canvas, listed under Lab 3. Our first step is to load this data.
+
+```{r}
+cps <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/cps.csv")
+knitr::kable(head(cps))
+```
+
+Here, we can see the names of the columns by:
+
+```{r}
+names(cps)
+```
+
+We can do some data cleaning, by creating a `wage` (dollars/hour) variable and restricting the data a bit to get a more balanced dataset:
+
+```{r}
+cps$wage <- cps$earnings/(cps$week*cps$hours)
+cps <- cps[cps$education <= 16,]
+```
+
+## Intercept Only Model
+
+Now, suppose we want to understand what determine the wage (by dollars/hour) each person receives. First, we start with with an *intercept-only* linear model:
+
+$$
+Wage_i = \beta_0 + \varepsilon_i
+$$ What this model does is finding $\beta_0$ that minimize:
+
+$$
+\sum_{i = 1}^n \{Wage_i - \beta_0\}^2
+$$
+
+We can estimate this in R using `lm()` function, as follow:
+
+```{r}
+mod.1 <- lm(wage ~ 1, cps)
+summary(mod.1)
+```
+
+Here, we see that the intercept, $\beta_0 = 21.53$. What does this mean? Let's try running this and compare the results:
+
+```{r}
+mean(cps$wage, na.rm = T)
+```
+
+Here, we see that, **in an intercept-only linear model, the intercept is the sample mean of the outcome variable**, which is `wage` is our case. We can also illustrate this by plotting the regression line on top of the scatterplot of the data. We will use two functions for this:
+
+-   `predict()`: Will generate predicted outcome from the model using the current data (if not specified), or on a specified dataset.
+
+-   `seq_along()`: Generate a sequence from 1 to length of the dataset.
+
+```{r}
+library(tidyverse)
+# Get the prediction
+predicted_cps <- data.frame(wage =  predict(mod.1))
+#Plot
+ggplot(data = cps, aes(x=seq_along(wage), y = wage)) + 
+  geom_point(color='cyan4', alpha = 0.2, size = 2) +
+  geom_line(color='red',data = predicted_cps,
+            aes(x=seq_along(wage), y= wage), lwd= 1) +
+  theme_minimal()
+```
+
+## Slope only Model
+
+A potential candidate for wage determinants is age, and we can use a regression model to test this hypothesis. However, before estimating the full model with age, we can try estimating a model without the intercept:
+
+$$
+Wage_i = \beta_1 Age_i + \varepsilon_i
+$$ In this case, the model minimizes:
+
+$$
+\sum_{i = 1}^n \{Wage_i - m(Age_i)\}^2
+$$ In which, $m(Age_i) = \beta_1 Age_i$.
+
+In R, we do this by adding `-1` to the beginning of `lm()` formula's right-hand side.
+
+```{r}
+mod.2 <- lm(wage ~ -1 + age, cps)
+summary(mod.2)
+```
+
+Here, what we did with this "slope only" model is **forcing the regression line to go through 0**. This is an example of **Constrained Least Squares** estimation, which we will discuss in later labs.
+
+::: callout-important
+## Note!
+
+Generally this type of slope only model is not very helpful, unless you have theoretical reasons to force the prediction when the covariates are all 0 to also be 0.
+:::
+
+Since our data does not have observations with `age = 0`, we will do the following to visualize it:
+
+-   Use `seq()` to generate a sequence of age from 0 to max age in our data (80).
+-   Use `predict()` to apply the model prediction to the new data.
+-   Plot the prediction.
+
+```{r}
+age_sequence <- seq(0,80,0.1)
+predicted_wage <-  predict(mod.2, newdata = data.frame(age = age_sequence))
+predicted_df <- data.frame(age = age_sequence, wage = predicted_wage)
+
+```
+
+Now, we can use this to plot the regression line:
+
+```{r}
+ggplot(data = cps, aes(x=age, y = wage)) + 
+  geom_point(color='cyan4', alpha = 0.2, size = 2) +
+  geom_line(color='red',data = predicted_df,
+            aes(x=age, y= wage), lwd= 1) +
+   theme_minimal()
+```
+
+## Full bivariate model
+
+As we can see, here, the regression line goes through the root (i.e., point \[0,0\]). However, the slope only model is not very accurate, and generally you do not have to force the intercept to be 0, unless it's reasonable to assume so. We can instead estimate the full model:
+
+$$
+Wage_i = \beta_0 + \beta_1 Age_i + \varepsilon_i
+$$
+
+Similar to above, this model minimizes:
+
+$$
+\sum_{i = 1}^n \{Wage_i - m(Age_i)\}^2
+$$
+
+However, here, $m(Age_i) = \beta_0 + \beta_1 Age_i$, and we have to solve for both $\beta_0$ and $\beta_1$. We do this in R by:
+
+```{r}
+mod.3 <- lm(wage ~ age, cps)
+summary(mod.3)
+```
+
+We can get the CIs with `confint()`:
+
+```{r}
+round(cbind(summary(mod.3)$coefficient, confint(mod.3)), digits = 3)
+```
+
+Similar to above, we can plot this:
+
+```{r}
+# Create predictions
+age_sequence <- seq(0,80,0.1)
+predicted_wage <-  predict(mod.3, newdata = data.frame(age = age_sequence))
+predicted_df <- data.frame(age = age_sequence, wage = predicted_wage)
+# Plot
+ggplot(data = cps, aes(x=age, y = wage)) + 
+  geom_point(color='cyan4', alpha = 0.2, size = 2) +
+  geom_line(color='red',data = predicted_df,
+            aes(x=age, y= wage), lwd= 1) +
+  theme_minimal()
+```
+
+Here, we see that this looks like a better fit. We can compare the two models by an exact F-test, which in R is through the function `anova()`:
+
+```{r}
+anova(mod.2, mod.3)
+```
+
+Here, the result indicates that `mod.3` results in a statistically significant improvement over `mod.2`. We can see this by comparing the Sum-of-squared-residuals (RSS) as well, 13509050 for `mod.2` and 13024464 for `mod.3`.
+
+```{r}
+print(paste0("SSR for Model 2: ",sum((mod.2$residuals)^2)))
+print(paste0("SSR for Model 3: ",sum((mod.3$residuals)^2)))
+print(paste0("Does Model 3 has lower SSR than Model 2: ",
+             sum((mod.3$residuals)^2) < sum((mod.2$residuals)^2)))
+```
+
+So, how do we interpret our full model? Here, $\beta_0$, the intercept, is the **expected wage when everything else in the model is 0** (may not be realistic in this case)
+
+```{r}
+predict(mod.3, newdata = data.frame(age = 0))
+mod.3$coefficients[1]
+```
+
+Next, the "slope", $\beta_1$, is the **marginal change** in expected `wage` if `age` increase by 1 unit. For example, here we can use the `predict()` function compare the expected wage for a 21 year old and a 20 year old:
+
+```{r}
+predict(mod.3, newdata = data.frame(age = 21)) - predict(mod.3, newdata = data.frame(age = 20))
+mod.3$coefficients[2]
+```
+
+## Categorical Variable
+
+Suppose we instead want to use `female` variable as a predictor of `wage`. We can estimate the following model:
+
+$$
+Wage_i = \beta_0 + \beta_1 Female_i + \varepsilon_i
+$$
+
+Similar to before, we estimate this in R by:
+
+```{r}
+mod.4 <- lm(wage ~ female, cps)
+summary(mod.4)
+```
+
+What does this model estimate? Here, the intercept is the expected `wage` if `female` = 0, i.e. *the average wage of male panelists*.
+
+```{r}
+male.sample <- cps[cps$female == 0,]
+mean(male.sample$wage, na.rm = T)
+mod.4$coefficients[1]
+```
+
+Meanwhile, the slope in this case is the **difference in average wages between male and female panelists**. From the regression results, we can see that this difference is negative, and statistically significant at 5%.
+
+```{r}
+female.sample <- cps[cps$female == 1,]
+mean(female.sample $wage, na.rm = T) - mean(male.sample$wage, na.rm = T)
+mod.4$coefficients[2]
+```
+
+We can easily see that this mean the average wage of female panelists is the sum of two coefficients $\beta_0 + \beta_1$:
+
+```{r}
+mean(female.sample$wage, na.rm = T)
+mod.4$coefficients[2] + mod.4$coefficients[1]
+```
+
+We can also get the CIs for our coefficients:
+
+```{r}
+round(cbind(summary(mod.4)$coefficient, confint(mod.4)), digits = 3)
+```
+
+Now, as discussed in previous lectures and lab, we can compare sub-sample means manually using plug-in estimator:
+
+```{r}
+
+var_diff <- var(female.sample$wage)/nrow(female.sample ) + 
+  var(male.sample$wage)/nrow(male.sample )
+se_diff <- sqrt(var_diff)
+
+sample_diff <- mean(female.sample$wage) - mean(male.sample$wage)
+q <- qnorm(1 - 0.05/2)
+
+lower.bound <- sample_diff - q*se_diff
+upper.bound <- sample_diff + q*se_diff
+
+print(paste0("The Plug-in 95% CI is {", lower.bound,", ",upper.bound,"}"))
+upper.bound - lower.bound
+```
+
+We can also do this using the `t.test()` function:
+
+```{r}
+t.test(cps[cps$female == 1,]$wage, cps[cps$female == 0,]$wage,
+       var.equal = T)
+```
+
+Here, both appear to be similar, with the same CI of the difference.
+
+Finally, we can plot the results:
+
+```{r}
+# Plot
+predicted_cps <- data.frame(wage =  predict(mod.4), female = cps$female)
+ggplot(data = cps, aes(x=seq_along(wage), y = wage)) + 
+  geom_point(color='cyan4', alpha = 0.2, size = 2) +
+  geom_line(data = predicted_cps,
+            aes(x=seq_along(wage), y= wage, color = factor(female)), lwd= 1) +
+  theme_minimal()
+```
+
+We can also use the binary variable as the x axis like this:
+
+ggplot(data = cps, aes(x=female, y = wage)) +
+
+geom_point(color='cyan4', alpha = 0.2, size = 2) +
+
+geom_line(data = predicted_cps,
+
+aes(x=female, y= wage),color='darkorange', lwd= 1) +
+
+theme_minimal()
+
+```{r}
+# Plot
+ggplot(data = cps, aes(x=female, y = wage)) + 
+  geom_point(color='cyan4', alpha = 0.2, size = 2) +
+  geom_line(data = predicted_cps,
+            aes(x=female, y= wage),color='darkorange', lwd= 1) +
+  theme_minimal()
+```
+
+## Inference with the Bootstrap
+
+Instead of relying on the provided CI, we can also use the Bootstrap to construct the CIs of our parameters.
+
+```{r}
+set.seed(10)
+M <- 5000
+# Empty matrix to save the values
+beta <- matrix(NA, M, 2)
+
+for(i in 1:M){
+  cps_resampled <- cps[sample(nrow(cps), replace = T),]
+  mod.boot <- lm(wage ~ female, cps_resampled)
+  beta[i,] <- mod.boot$coefficients
+}
+# SE of b0
+se_0 <- sd(beta[,1])
+se_0
+```
+
+The CI can be constructed using the quantiles:
+
+```{r}
+print(paste0("95% CI of Beta_0: [",quantile(beta[,1], 0.025),",", quantile(beta[,1], 0.975),"]"))
+```
+
+Similarly for Beta_1:
+
+```{r}
+# SE of b1
+se_1 <- sd(beta[,2])
+se_1
+print(paste0("95% CI of Beta_0: [",quantile(beta[,2], 0.025),",", quantile(beta[,2], 0.975),"]"))
+```
+
+We can also visualize the distributions:
+
+```{r}
+hist(beta[,1], prob = TRUE, main = "Bootstrap Distribution of Beta_0")
+lines(density(beta[,1]), col = 2, lwd = 2)
+hist(beta[,2], prob = TRUE, main = "Bootstrap Distribution of Beta_1")
+lines(density(beta[,2]), col = 2, lwd = 2)
+```
+
+# Estimating OLS from Scratch
+
+In this next section, we will briefly discuss how to estimate OLS models from scratch instead of using `lm()`.
+
+## Simple Linear Case
+
+In a simple linear regression case, the OLS estimator has the form:
+
+$$
+\widehat{\beta_1} = \frac{\sum_{i=1}^n (x_i - \bar{x})(y_i - \bar{y})}{\sum_{i=1}^n (x_i - \bar{x})^2} = \frac{Cov(x,y)}{s^2_x}
+$$
+
+Let's revisit the full model with `wage` and `age`:
+
+```{r}
+summary(mod.3)
+```
+
+We can estimate this using the above formula:
+
+```{r}
+beta_1 = cov(cps$age, cps$wage)/var(cps$age)
+beta_1
+mod.3$coefficients[2]
+```
+
+The formula can also be written as:
+
+$$
+\widehat{\beta_1} = r_{x,y} \frac{s_y}{s_x}
+$$
+
+We calculate this in R as:
+
+```{r}
+cor(cps$age, cps$wage)*sd(cps$wage)/sd(cps$age)
+```
+
+## Matrix Form
+
+The above formulae are only applicable for simple linear regression case, with one predictor. A more generalized solution to the OLS estimator is:
+
+$$
+\widehat{\beta} = (\mathbf{X}^{T}\mathbf{X})^{-1}\mathbf{X}^{T}\mathbf{y}
+$$
+
+In with, matrix $\mathbf{X}$ is the *design matrix*, the matrix of predictors, and $\mathbf{y}$ is the vector of outcomes. One important thing to note here is that we need to a column of 1 to our matrix $\mathbf{X}$, if we want to estimate the full model with an intercept. In R, we can estimate this as follow. First, we create matrices X and y:
+
+```{r}
+X <- as.matrix(cbind(1, cps$age))
+y <- as.matrix(cps$wage)
+```
+
+Now, applying the OLS Estimator formula:
+
+```{r}
+#Transpose X
+tX <- t(X)
+#X'X
+XtX <- tX %*% X
+#(X'X)^-1
+XtX.t <- solve(XtX) 
+#(X'X)^-1 X'y
+beta <- XtX.t%*%tX%*%y 
+print(beta)
+```
+
+We can also put everything in one line:
+
+```{r}
+solve(t(X)%*%X)%*%t(X)%*%y
+```
+
+## Generic Least Squares Estimation
+
+OLS is a special case of a generic class of *Least squares* estimator. As we have learned in class, the above formulae, both in scalar and matrix forms, of OLS estimator are derived from the solution of the following least squares optimization problem:
+
+$$
+\text{arg}\min_{\beta_0, \beta_1} \frac{1}{2} \sum_{i=1}^n (y_i - \beta_0 -\beta_1x_i)^2
+$$
+
+Or, for cases with more than one predictor:
+
+$$
+\text{arg}\min_{\mathbf{\beta}} ||\mathbf{y} - \mathbf{X}\mathbf{\beta} ||_2^2
+$$
+
+In R, we can solve the optimization problem above with `optim()` function. First, we define the function:
+
+```{r}
+least_squares <- function(beta, x, y ){
+  #Write down the function above here
+  residual <- y - beta[1] - beta[2]*x
+  rss <- sum(residual^2)
+  return(rss)
+}
+```
+
+Next, we can solve the function using `optim()`. Function `optim()` implements multiple optimization methods, here we use `BFGS`:
+
+```{r}
+res.linear <- optim(par = c(0, 0), fn = least_squares,
+                    method= 'BFGS', x = cps$age, y = cps$wage,
+                    hessian = T)
+print(res.linear$par)
+```
+
+We can see that this gives the similar coefficients to what we got before with the analytical formula.
+
+This optimization approach is very flexible, in that it allows us to use non-standard forms of loss function, or impose constraints on the parameters. One example here is the **Least absolute deviations** model, which minimize the *absolute deviation* instead of *squared residual*:
+
+$$
+\text{arg}\min_{\mathbf{\beta}} \sum_{i=1}^n |\mathbf{y} - \mathbf{X}\mathbf{\beta} |
+$$
+
+This type of model is more *robust* to outliers in the data. Here, we can estimate this as follow:
+
+```{r}
+LAD <- function(beta, x, y ){
+  #Write down the function above here
+  residual <- y - beta[1] - beta[2]*x
+  sad <- sum(abs(residual))
+  return(sad)
+}
+```
+
+Let's feed this to `optim()`:
+
+```{r}
+res.linear <- optim(par = c(0, 0), fn = LAD,
+                    method= 'BFGS', x = cps$age, y = cps$wage)
+print(res.linear$par)
+```
+
+We can see that this is slightly different from the OLS model. Let's plot this:
+
+```{r}
+# Create predictions
+age_sequence <- seq(0,80,0.1)
+#OLS
+predicted_wage <-  predict(mod.3, newdata = data.frame(age = age_sequence))
+predicted_ols <- data.frame(age = age_sequence, wage = predicted_wage)
+#LAD
+predicted_wage <- res.linear$par[1] + age_sequence* res.linear$par[2]
+predicted_lad <- data.frame(age = age_sequence, wage = predicted_wage)
+# Plot
+ggplot(data = cps, aes(x=age, y = wage)) + 
+  geom_point(color='cyan4', alpha = 0.2, size = 2) +
+  geom_line(color='red',data = predicted_ols,
+            aes(x=age, y= wage), lwd= 1) +
+  geom_line(color='green',data = predicted_lad,
+            aes(x=age, y= wage), lwd= 1) +
+  theme_bw()
+```

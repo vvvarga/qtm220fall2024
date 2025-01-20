@@ -1,0 +1,575 @@
+---
+title: "Lab 3: The Bootstrap & Probability Review"
+author: "F. Nguyen"
+date: " 13 September 2024"
+toc: true
+format:
+  html:
+    code-tools: true
+    self-contained: true
+    theme: minty
+execute:
+  warning: false
+---
+
+# Asymptotic distributions
+
+## Distribution of Sample Mean
+
+Recall from the class, according to the Central Limit Theorem, sample mean is approximately normal distribution when $n$ is sufficiently large, with mean $\mu_{\bar{X}} = \mu_X$, and standard deviation $\sigma_{\bar{X}} = \frac{\sigma_X}{\sqrt{n}}$:
+
+$$
+\bar{X} \sim \mathcal{N}(\mu_X, \frac{\sigma_X^2}{n})
+$$
+
+In practice, we don't often now $\sigma_X$, so the sample standard error $s$ is used instead for approximation. We can demonstrate this with our Airbnb dataset. Let's look at the prices of the listings, in dollars (`price`):
+
+```{r}
+library(tidyverse)
+airbnb <- read.csv("C:/Users/13015/OneDrive - Emory University/Documents/Fall 2024/QTM 220/austin_airbnb_july24.csv")
+knitr::kable(head(airbnb))
+```
+
+```{r}
+# mean
+mu <- mean(airbnb$price)
+mu
+# population SD
+n <- nrow(airbnb)
+n
+sigma <- sqrt(var(airbnb$price)*((n - 1)/n))
+sigma
+```
+
+Here, we can see that the population mean is $\mu \approx 292.69$. Now, assuming we can only sample 5000 listings. We can simulate the distribution of sample mean by repeatedly sample the population data (*with replacement*), and then record the sample mean in each iteration. Let's use a `for` loop with 10,000 iterations to do this:
+
+```{r}
+set.seed(42)
+#Save the sample mean
+n <- 10000
+x_bar <-  rep(NA, n)
+#Loop
+for(i in 1:n){
+  x_bar[i] <- mean(sample(airbnb$price, 5000, replace = T))
+}
+```
+
+Let's look at the mean:
+
+```{r}
+mean(x_bar)
+```
+
+As in previous lab, we see that this is very close to the population mean above. How about the standard deviation of the mean:
+
+```{r}
+sd(x_bar)
+```
+
+Compare this to $\frac{\sigma}{\sqrt{n}}$:
+
+```{r}
+sigma/sqrt(5000)
+```
+
+These are also roughly the same. We can plot the distribution:
+
+```{r}
+ggplot(data = data.frame(x_bar = x_bar), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity", binwidth = 2) +
+  geom_vline(xintercept = mean(x_bar), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mu, linetype="dotted", #pop mean
+                color = "darkorchid", linewidth=1) +
+  theme_minimal()
+```
+
+We can see that the distribution is normally distributed. Now, for demonstration, let's see what happens when we have a **smaller sample size**, let's say 50 listings:
+
+```{r}
+set.seed(42)
+#Save the sample mean
+n <- 10000
+x_bar_small <-  rep(NA, n)
+#Loop
+for(i in 1:n){
+  x_bar_small[i] <- mean(sample(airbnb$price, 50, replace = T))
+}
+
+mean(x_bar_small)
+
+ggplot(data = data.frame(x_bar = x_bar_small), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity", binwidth = 50) +
+  geom_vline(xintercept = mean(x_bar_small), linetype="dashed",  #x_bar mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = mu, linetype="dotted", #pop mean
+                color = "darkorchid", linewidth=1) +
+  theme_minimal()
+```
+
+This is not as normally distributed as the larger sample above, and with much large standard deviation. This speaks to the importance of considering sample size when performing statistical inference on your sample.
+
+## Distribution of Sample Proportion
+
+In many cases, we may be interested in a proportion in our sample instead. This problem, as a matter of fact, is the sample as the sample mean of a binarized variable from the sample (i.e., 1 if voted GOP, 0 if voted Dem). From class, we know that the variance of a proportion is $\sigma^2 = p(1 - p)$, with $p$ being the population proportion (i.e., population mean of the binary variable). Thus, the sample proportion distribute:
+
+$$
+\hat{p} \sim \mathcal{N}(p, \frac{p(1-p)}{n})
+$$
+
+Back to the Airbnb dataset, let's use the proportion of Airbnb listings with superhost as an example. The population proportion is:
+
+```{r}
+# mean
+p <- mean(airbnb$host_is_superhost == "t")
+p
+# sd
+sigma <- sqrt(p*(1-p))
+sigma
+```
+
+Let's simulate the sampling distribution as we did in the previous section:
+
+```{r}
+set.seed(42)
+#Save the sample mean
+n <- 10000
+p_hat <-  rep(NA, n)
+#Loop
+for(i in 1:10000){
+  p_hat[i] <- mean(sample(airbnb$host_is_superhost, 5000, replace = T) == "t")
+}
+```
+
+Let's check the statistics:
+
+```{r}
+mean(p_hat)
+p
+```
+
+We can see that they are very similar. How about the standard deviation?
+
+```{r}
+sd(p_hat)
+sigma/sqrt(5000)
+```
+
+Once again, very similar results. Let's plot the distribution:
+
+```{r}
+ggplot(data = data.frame(p_hat = p_hat), aes(x = p_hat)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean(p_hat), linetype="dashed",  #p_hat mean 
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = p, linetype="dotted", #pop mean
+                color = "darkorchid", linewidth=1) + 
+  theme_minimal()
+```
+
+# Confidence Interval
+
+## Plug-in Estimator
+
+For a parameter $\theta$ related to $X$, a confidence interval of confidence level $1 - \alpha$ is a pair of random variables $(L(X), U(X))$ so that:
+
+$$
+Pr(L(X) < \theta < U(X)) = 1 - \alpha
+$$
+
+In the context of population mean, due to the symmetry of sampling distribution, this take the form:
+
+$$
+\left\{\bar{X} - Q(1- \frac{\alpha}{2}) \sqrt{\frac{s^2}{n}};  \bar{X} + Q(1- \frac{\alpha}{2})  \sqrt{\frac{s^2}{n}} \right\}
+$$
+
+In which, $Q()$ is the **quantile function** of a distribution, that is, if a distribution has the CDF $F_X(x) = P(X \leq x)$, $Q(F_X(x)) = x$. $\alpha$ is the level of significance, $1 - \alpha$ is the level of confidence.
+
+For smaller sample sizes, we often use **Student's t distribution** with $n - 1$ degree-of-freedom (which is used in R `t.test()`). However, we know that, with CLT, that *asymptotically*, the mean converges to a normal distribution, so the **asymptotic confidence interval** uses a standard normal distribution, and this is generally correct for larger samples.
+
+In applications, we often do not have population statistics, thus we can replace these with sample statistics to form a \`\`Plug-in'' estimator of the confidence interval. For example, let's assume we have a sample of 5000 Airbnb listings:
+
+```{r}
+set.seed(31)
+oursample <- sample(airbnb$price, 5000, replace = T)
+sample.mean <- mean(oursample)
+sample.mean
+sample.sd <- sd(oursample)
+sample.sd
+```
+
+The estimated standard error of the sample mean using the formula above is:
+
+```{r}
+est.mean.se <- sample.sd/sqrt(length(oursample))
+est.mean.se
+```
+
+Now, we can construct the Confidence Interval from the sample statistics above simply by plugging them into the formula. The 95% CI is:
+
+```{r}
+q <- qnorm(1 - 0.05/2)
+q
+n <- length(oursample)
+lower.bound <- sample.mean - q*est.mean.se 
+upper.bound <- sample.mean + q*est.mean.se
+print(paste0("The Plug-in 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+Here, the interpretation is that if we construct the interval using this estimator, for a very large/infinite number of samples, 95% of the times it would contain the true population mean. We can test this through simulation:
+
+```{r}
+set.seed(42)
+N <- 20000
+# To save both mean and se
+simulation_list <- list(rep(NA, N), rep(NA, N))
+
+for (i in 1:N){
+  sample_i <- sample(airbnb$price, 5000, replace = T)
+  simulation_list[[1]][i] <- mean(sample_i)
+  simulation_list[[2]][i] <- sd(sample_i)
+}
+```
+
+Now, we have two lists of corresponding sample means and standard deviations. We can compare the middle 95% of the sampling distribution with the plug in CI:
+
+```{r}
+quantile(simulation_list[[1]], c(0.025, 0.975))
+```
+
+Compared to the plug-in CI of our original sample:
+
+```{r}
+print(paste0("The Plug-in 95% CI is {", lower.bound,", ",upper.bound,"}"))
+```
+
+Let's construct the intervals from these, and check how many of them contain the population mean:
+
+```{r}
+q <- qnorm(1 - 0.05/2)
+# Lower Bound
+lb.list <- simulation_list[[1]] - q*simulation_list[[2]]/sqrt(5000)
+# Upper Bound
+ub.list <- simulation_list[[1]] + q*simulation_list[[2]]/sqrt(5000)
+mean((mu >= lb.list) & (mu <= ub.list))
+```
+
+Here, we see that the coverage is approximately 95%. Alternatively, if we desire a 90% confidence:
+
+```{r}
+q <- qnorm(1 - 0.1/2)
+lb.list <- simulation_list[[1]] - q*simulation_list[[2]]/sqrt(5000)
+ub.list <- simulation_list[[1]] + q*simulation_list[[2]]/sqrt(5000)
+mean((mu >= lb.list) & (mu <= ub.list))
+```
+
+## The Bootstrap and Bootstrapped CI
+
+Another approach to construct confidence interval is the Bootstrap. This is a simple yet powerful procedure for estimating the distribution of an estimator
+
+by resampling, with replacement, from a given sample. Basically, instead of sampling from the population, which we normally do not have, we resample with replacement from the sample instead to approximate the sampling distribution. With large enough sample size, this gives us a good approximation of the actual sampling distribution.
+
+The basic steps are:
+
+1.  We iterate over the data in $M$ iterations ($M$ being a large number).
+
+2.  In each iteration $i$, we resample the data, with replacement, and then calculate the measure of interest (e.g., sample mean $\bar{X}$, the regression coefficient $\widehat{\beta}$) on the new dataset.
+
+3.  Next, we can simply save these measures, and use them to *approximate* the sampling distribution. With a large enough sample this converges to the true sampling distribution.
+
+::: callout-important
+## Important Note!
+
+The version of the Bootstrap we discuss here is call the **basic nonparametric bootstrap**. There are actually many other types of bootstraps and other resampling approaches, which we may discuss in a future lab if time permits.
+:::
+
+Let's return to the original sample above. We can construct the bootstrapped CI by:
+
+```{r}
+set.seed(42)
+#Save the sample mean
+N <- 20000
+n <- length(oursample)
+mean.boot <-  rep(NA, n)
+#Loop
+for(i in 1:N){
+  mean.boot[i] <- mean(sample(oursample, n, replace = T))
+}
+```
+
+Now, we can use the standard error of this to approximate the SD of the sampling distribution of the mean:
+
+```{r}
+sd(mean.boot)
+```
+
+Compare this to:
+
+```{r}
+sd(simulation_list[[1]])
+```
+
+We can see that these are approximately similar. We construct the 95% CI using the middle 95% of the bootstrap distribution:
+
+```{r}
+quantile(mean.boot, c(0.025, 0.975))
+```
+
+This is called the *Percentile bootstrap CI*, and as we can see is roughly similar to the $(269.32, 320.39)$ plug-in CI we calculated in the previous section. We can then proceed to use this CI for hypothesis testing as usual.
+
+::: callout-important
+## Important Note!
+
+For this course, we will mostly use this type of bootstrap CIs, but there are statistically less biased ways to construct the bootstrap CIs, which we may discuss in the future if time permits.
+:::
+
+Compare the bootstrap CI to the real middle 95% of our sampling distribution:
+
+```{r}
+quantile(simulation_list[[1]], c(0.025, 0.975))
+```
+
+We can see that the bootstrap CI is pretty accurate. Let's plot everything:
+
+```{r}
+ggplot(data = data.frame(x_bar = simulation_list[[1]]), aes(x = x_bar)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = quantile(mean.boot, 0.025), linetype="dashed", # bootstrap CI
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(mean.boot, 0.975), linetype="dashed",
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = lower.bound, linetype="dotted", # Plug in CI
+                color = "darkorchid", linewidth=1) +
+    geom_vline(xintercept = upper.bound, linetype="dotted", 
+                color = "darkorchid", linewidth=1) +
+  annotate("rect", xmin = quantile( simulation_list[[1]], 0.025), # Real 95%
+                   xmax = quantile( simulation_list[[1]], 0.975), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+## Bootstrap CI vs. Plug-in CI
+
+In the above, we see that the plug-in CI appears to be somewhat more accurate than the bootstrap CI. However, this relies on the prior knowledge of the asymptotic distribution of the means. There are many cases where we do not know the distribution. For example, if we want to know the population standard deviation, it is more convenient to use the bootstrap:
+
+```{r}
+set.seed(42)
+#Save the sample sd
+N <- 50000
+n <- length(oursample)
+sd.boot <-  rep(NA, n)
+#Loop
+for(i in 1:N){
+  sd.boot[i] <- sd(sample(oursample, n, replace = T))
+}
+quantile(sd.boot, c(0.025, 0.975))
+```
+
+Compare this to:
+
+```{r}
+quantile(simulation_list[[2]], c(0.025, 0.975))
+```
+
+We can also illustrate this:
+
+```{r}
+ggplot(data = data.frame(sddev = simulation_list[[2]]), aes(x = sddev)) +
+  geom_histogram(fill = "cyan4", alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = quantile(sd.boot, 0.025), linetype="dashed", # bootstrap CI
+                color = "coral", linewidth=1) +
+  geom_vline(xintercept = quantile(sd.boot, 0.975), linetype="dashed",
+                color = "coral", linewidth=1) +
+  annotate("rect", xmin = quantile( simulation_list[[2]], 0.025), # Real 95%
+                   xmax = quantile( simulation_list[[2]], 0.975), 
+                   ymin = 0, ymax = Inf, fill = "blue",
+                   alpha = .2) +
+  theme_minimal() 
+```
+
+Here, the bootstrap CI did a decent job at 95% coverage. We cannot use the previous plug-in CI formula, since this is not a normal distribution.
+
+# Random Variables
+
+## Discrete Random Variables
+
+The most basic discrete random variables are uniform discrete ones, in which each elements of a set have equal chances of occuring. For example, if we have a 20 sided dice:
+
+```{r}
+X <- 1:20
+X
+```
+
+Here, the probability of rolling a side, if the dice is fair, is simple $\frac{1}{n} = \frac{1}{20}$. We can try rolling 10,000 times:
+
+```{r}
+set.seed(42)
+dices <- replicate(10000, sample(X, 1))
+freq.table <- table(dices)
+freq.table/sum(freq.table)   
+```
+
+Now, the expectation of discrete random variable is:
+
+$$
+\mathbb{E}(X) = \sum_{i = 1}^n x_i p_{X}(x_i)
+$$
+
+Here, we have:
+
+```{r}
+expect <- sum(1/20*X)
+expect
+```
+
+Compare this to the simulated distribution above:
+
+```{r}
+mean(dices)
+```
+
+Now, assume we have an loaded D6 dice, which has been tampered with to have different probabilities for each side:
+
+| Face | Probability |
+|------|-------------|
+| 1    | 0.05        |
+| 2    | 0.10        |
+| 3s   | 0.15        |
+| 4    | 0.25        |
+| 5    | 0.30        |
+| 6    | 0.15        |
+
+We can recreate the probability mass function of this in R as:
+
+```{r}
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+```
+
+To simulate rolls from this, we can set `prob =` with the defined PMF:
+
+```{r}
+set.seed(42)
+dices <- replicate(10000, sample(dice_faces, 1, replace = T, 
+                                 prob = loaded_dice_pmf))
+freq.table <- table(dices)
+freq.table/sum(freq.table)   
+```
+
+Now, the expectation can be calculated, using the matrix multiplication:
+
+```{r}
+dice_faces %*% loaded_dice_pmf
+```
+
+Check with the simulated distribution:
+
+```{r}
+mean(dices)
+```
+
+## Continuous Random Variables
+
+With continuous random variables, instead of a Probability Mass function, we have a Probability Density Function $f_X(x)$. The expectation is then:
+
+$$
+\mathbb{E}(X) = \int_{-\infty}^{\infty}x_i f_{X}(x_i)dx
+$$
+
+For example, a Gaussian distribution has the pdf:
+
+$$
+f(x) = \frac{1}{\sigma\sqrt{2\pi}}e^{-\frac{1}{2} \left ( \frac{x - \mu}{\sigma}\right)^2}
+$$
+
+We can calculate the expectation of $\mathcal{N}(2, 5)$ for example:
+
+```{r}
+f <- function(x) {(1/(5*sqrt(2*pi))) * exp(-0.5*((x - 2)/5)^2)}
+g <- function(x) {x * f(x)}
+integrate(g, lower = -Inf, upper = Inf)
+```
+
+## Sum of Random Variables
+
+For two *independent* random variables, the expectation of the sum is also the sum of two expectations:
+
+$$
+\mathbb{E}(X + Y) = \mathbb{E}(X) + \mathbb{E}(Y)
+$$
+
+For example, if we want to see the expected points from a roll of two fair 20D dice:
+
+```{r}
+set.seed(42)
+dices <- replicate(10000, sum(sample(1:20, 2, replace = T)))
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+Here, we see that the expectation is 21, which is 10.5 + 10.5. Let's try with a roll of 1 loaded 6D dice and 1 normal 6D dice:
+
+```{r}
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+set.seed(42)
+dices <- replicate(10000, sample(dice_faces, 1, replace = T, prob = loaded_dice_pmf) + sample(1:6, 1))
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+Here, the expected value is 7.6 = 4.1 + 3.5, i.e. the sum of expected vaues of the loaded and normal dices. We can further show that:
+
+$$
+\mathbb{E}(aX + Y) = a\mathbb{E}(X) + \mathbb{E}(Y)
+$$
+
+By simulating rolls where the loaded dice is given 2x the points:
+
+```{r}
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+set.seed(42)
+dices <- replicate(10000, 2*sample(dice_faces, 1, replace = T, prob = loaded_dice_pmf) + 
+                     sample(1:6, 1))
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+## Conditional Probability
+
+We can also demonstrate conditional probability in R. Here, for example, if we have a 70% chance of having a fair dice, and 30% chance of having a loaded dice, we can simulate this by drawing twice:
+
+```{r}
+set.seed(42)
+loaded_dice_pmf <- c(0.05, 0.1, 0.15, 0.25, 0.3, 0.15)
+dice_faces <- 1:6
+dices <- rep(NA, 10000)
+
+# Simulate the process
+for(i in 1:10000) {
+  X <- sample(0:1, 1, replace = T, prob = c(0.7, 0.3))
+  dices[i] <- ifelse(X == 1,
+                      sample(dice_faces, 1, replace = T, prob = loaded_dice_pmf),
+                      sample(1:6, 1))
+}
+freq.table <- table(dices)
+print(freq.table/sum(freq.table))
+mean(dices)
+```
+
+Here, we can see that the dice roll is conditioned on whether it is a loaded dice ($X = 1$), or a fair dice ($X = 0$). Here, we can see that the overall expected points is, by law of iterated expectation:
+
+$$
+\mathbb{E}(Y) = \mathbb{E}\left[\mathbb{E}(X|Y)\right] = p_X( 0)\mathbb{E}(Y | X = 0) + p_X(1)\mathbb{E}(Y | X = 1)
+$$
+
+Plugging in, we get:
+
+$$
+\mathbb{E}(Y) = 0.3*4.1 + 0.7*3.5 = 3.68
+$$
